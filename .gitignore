@@ -1,0 +1,40 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# JavaScript
+node_modules/
+dist/
+coverage/
+.npm-cache/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+
+# Data and model artifacts
+data/
+datasets/
+models/
+artifacts/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
