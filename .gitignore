@@ -17,6 +17,7 @@ coverage/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest_tmp/
 .ruff_cache/
 *.egg-info/
 build/
