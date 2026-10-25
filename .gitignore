@@ -24,10 +24,15 @@ build/
 
 # Data and model artifacts
 data/
+!/ai/src/data/
 datasets/
 models/
 artifacts/
 checkpoints/
+/PKLot/
+*.tar
+*.tar.gz
+*.tgz
 *.pt
 *.pth
 *.ckpt
