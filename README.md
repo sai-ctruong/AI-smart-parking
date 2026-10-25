@@ -103,6 +103,19 @@ py -m venv .venv
 
 Install optional computer vision dependencies only when needed: `pip install -e '.[vision,dev]'`. This does not download a dataset or model weights.
 
+### Prepare PKLot manifests
+
+After extracting and auditing the full dataset, generate leakage-safe train/validation/test manifests for one camera:
+
+```powershell
+cd ai
+.\.venv\Scripts\python.exe -m pip install -e '.[audit,dev]'
+cd ..
+.\ai\.venv\Scripts\python.exe .\ai\scripts\prepare_dataset.py --camera UFPR04 --seed 42
+```
+
+The script reads `PKLOT_DATASET_ROOT` or defaults to `ai/data/raw/PKLot/`. It writes ignored manifests, split counts, and visual ROI samples under `ai/data/processed/pklot/`. See [dataset preparation details](docs/DATASET.md#roi-preparation-and-leakage-safe-manifests-task-05). The three-image archive sample is insufficient for this step; use an extracted dataset with at least three independent capture-day groups. No model is trained.
+
 ## Configuration and data
 
 In development (the default), the backend loads the root `.env` file and process environment variables override it. Set `CORS_ORIGINS` to a JSON array of exact browser origins, such as `["http://localhost:5173"]`; an empty list allows no cross-origin requests. For production, set `APP_ENV=production` and supply `DATABASE_URL` and any `CORS_ORIGINS` through process environment variables. Production ignores the local `.env` file and requires `DATABASE_URL` at startup. Never commit `.env` files, secrets, datasets, checkpoints, or other large model artifacts. Keep ground truth, model predictions, and human review data separate in future workflows.

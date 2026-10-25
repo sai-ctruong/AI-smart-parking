@@ -1,0 +1,13 @@
+{
+  "camera_id": "UFPR04",
+  "dataset_root": null,
+  "output_root": null,
+  "seed": 42,
+  "near_duplicate_hamming": 4,
+  "train_fraction": 0.7,
+  "val_fraction": 0.15,
+  "test_fraction": 0.15,
+  "image_size": 224,
+  "visual_samples_per_split": 3,
+  "pretrained": true
+}
