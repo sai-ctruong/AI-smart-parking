@@ -377,9 +377,11 @@ def _save(
     final = root / key
     temporary = root / f".{snapshot_id.hex}.uploading"
     renamed = False
+    staged = False
     try:
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
         with temporary.open("xb") as output:
+            staged = True
             output.write(data)
             output.flush()
             os.fsync(output.fileno())
@@ -419,9 +421,11 @@ def _save(
         return snapshot, predictions
     except (OSError, SQLAlchemyError) as exc:
         session.rollback()
-        temporary.unlink(missing_ok=True)
-        if not renamed:
-            final.unlink(missing_ok=True)
+        if staged and not renamed:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Temporary snapshot cleanup failed")
         logger.error("Snapshot persistence failed: %s", type(exc).__name__)
         raise ApiError(
             503, "SERVICE_UNAVAILABLE", "Snapshot could not be saved"

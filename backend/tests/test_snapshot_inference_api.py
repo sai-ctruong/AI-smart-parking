@@ -417,11 +417,19 @@ def test_valid_jpeg_preserves_original_bytes(context):
         assert session.scalar(select(Snapshot)).mime_type == "image/jpeg"
 
 
-def test_unwritable_image_root_leaves_no_snapshot_or_prediction(context):
+def test_unwritable_image_root_leaves_no_snapshot_or_prediction(context, monkeypatch):
     client, engine, admin, tmp_path = context
     camera_id = configured_camera(client, admin, spots=1)
     blocked = tmp_path / "blocked"
     blocked.write_text("not a directory", encoding="utf-8")
+    original_unlink = Path.unlink
+
+    def reject_child_unlink(path, *args, **kwargs):
+        if path.parent == blocked:
+            raise NotADirectoryError("parent is a file")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", reject_child_unlink)
     client.app.state.settings.image_storage_root = blocked
     response = upload(client, admin, camera_id)
     assert response.status_code == 503

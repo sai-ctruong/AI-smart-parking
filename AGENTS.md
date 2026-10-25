@@ -13,7 +13,7 @@
 11. Add appropriate tests and update documentation.
 12. Run feasible checks after implementing each task.
 13. Report modified files, commands run, test results, blockers, and manual verification steps.
-14. After completing each task, run relevant checks. If they pass, commit and push the task to `https://github.com/sai-ctruong/AI-smart-parking.git`. Do not push when checks fail; report any access or push blocker. Do not create extra branches unless requested.
+14. After each task, run checks equivalent to `.github/workflows/checks.yml`, including relevant cross-platform regression cases. Do not push when any required check fails, when known GitHub Actions failures remain unresolved, or when the CI-equivalent checks cannot be verified; report the blocker and leave the work local. For a CI repair, reproduce the failure and verify the fix on a compatible platform before pushing. After any push, inspect the GitHub Actions result; a red run means the task is unfinished and must be fixed before starting another task. Do not create extra branches unless requested. A task that explicitly forbids commits or pushes takes precedence.
 15. Prefer maintainable solutions over unnecessary complexity.
 
 ## Frontend design
