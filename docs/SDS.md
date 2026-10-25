@@ -9,8 +9,8 @@
 | Web UI | `frontend/src/App.tsx` is a placeholder React page. | Authenticated lot view, polygon editor, upload, overlay, history/review/export. |
 | HTTP API | `backend/app/main.py` exposes only `/health`; CORS currently permits GET. | Versioned `/api/v1` routes, request validation, backend RBAC, image-serving and CSV responses; extend CORS methods as required. |
 | Configuration | `backend/app/config.py` separates development `.env` from production process variables. | Token signing key, private image root, upload limit, confidence threshold and staleness threshold, with startup validation. |
-| Database | `backend/app/db.py` supplies lazy SQLAlchemy engine/session; Alembic `0001_initial` creates no tables. | Models in [ERD.md](ERD.md), Alembic migration, transaction boundaries. |
-| AI | `ai/src/smart_parking_ai/dataset_audit.py` validates PKLot ground truth and draws audit overlays. | Separate inference adapter/model artifact with versioned output; dataset-audit XML never enters the operational API. |
+| Database | `backend/app/db.py` supplies lazy SQLAlchemy engine/session; `backend/app/models.py` and Alembic `0002_smart_parking_schema` define the MVP tables and constraints. | Transactional feature services and routes; PostgreSQL deployment verification. |
+| AI | `ai/src/smart_parking_ai/dataset_audit.py` validates PKLot ground truth; `ai/src/inference/predictor.py` provides standalone checkpoint inference. | Backend inference integration with versioned operational output; dataset-audit XML never enters the operational API. |
 | PostgreSQL | `infrastructure/compose.yaml` provides local PostgreSQL 16 with a persistent volume. | Production database provisioning/backup policy remains separate. |
 
 ## Target component boundaries
@@ -61,4 +61,4 @@ Use database constraints for uniqueness and foreign keys in [ERD.md](ERD.md). Wr
 
 Use the common [API error envelope](API_SPEC.md#error-conventions). A model failure must leave an auditable snapshot with unknown per-spot results or fail atomically before acceptance; the selected strategy here is unknown per spot. Authentication failures do not disclose whether a username exists. Corrupt and oversized uploads are rejected before durable persistence. The API logs a request ID but does not log secrets or image bytes.
 
-Before building routes, add migration/model tests, role denial tests, polygon validation tests, image validation tests, prediction/unknown/review tests, time-boundary tests for `STALE`, and CSV contract tests. The proposed requirement-to-test mapping is in [RTM.md](RTM.md). Current `scripts/check.ps1` covers the skeleton only.
+The schema has migration/model tests for relationships, constraints, provenance, and polygon validation. Before building routes, add role denial, image validation, prediction/unknown/review service, `STALE` time-boundary, and CSV contract tests. The proposed requirement-to-test mapping is in [RTM.md](RTM.md). `scripts/check.ps1` runs the current test suites.

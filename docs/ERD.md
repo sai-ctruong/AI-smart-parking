@@ -1,6 +1,6 @@
-# MVP data model — proposed, not migrated
+# MVP data model — migrated schema
 
-**Status:** Draft companion to [SRS.md](SRS.md) and [API_SPEC.md](API_SPEC.md). The current Alembic `0001_initial` migration is empty; none of these tables exists yet. IDs are UUIDs, timestamps are UTC `timestamptz`, and the database is PostgreSQL 16.
+**Status:** Schema implemented by Alembic `0002_smart_parking_schema` after the empty `0001_initial` baseline. This does not imply approval of the draft [SRS.md](SRS.md) or implementation of feature routes. IDs are UUIDs, and PostgreSQL stores timestamp columns as timezone-aware `timestamptz`. Application code must supply UTC timestamps.
 
 ```mermaid
 erDiagram
@@ -15,6 +15,7 @@ erDiagram
   POLYGON_REVISION ||--o{ PREDICTION : used_by
   PARKING_SPOT ||--o{ PREDICTION : classified_as
   PREDICTION ||--o{ REVIEW : receives
+  USER ||--o{ AUDIT_LOG : acts_in
 ```
 
 ## Tables and relationships
@@ -29,8 +30,9 @@ erDiagram
 | `snapshots` | `id` PK; `camera_id` FK; `uploaded_by` FK users; `captured_at`; `uploaded_at`; `original_key` unique; `sha256`; `mime_type`; `byte_size`; `width`; `height` | Accepted original image metadata. `original_key` is an opaque private storage key, never an external URL or filesystem path in API responses. |
 | `predictions` | `id` PK; `snapshot_id` FK; `spot_id` FK; `polygon_revision_id` FK; unique `(snapshot_id, spot_id)`; `prediction_status`; `confidence` nullable; `model_version` nullable; `reason_code` nullable; `inferred_at` | Original immutable result for one captured active spot. The revision must belong to the same spot and camera as the snapshot. |
 | `reviews` | `id` PK; `prediction_id` FK; `reviewed_by` FK users; `reviewed_status`; `note` nullable; `reviewed_at` | Append-only human judgments. Latest `(reviewed_at, id)` determines effective status; original prediction stays intact. |
+| `audit_logs` | `id` PK; nullable `actor_id` FK users; `action`; `target_type`; `target_id`; `details` nullable; `created_at` | Records application audit events. Generic target identifiers are not foreign keys because they can refer to different entity types. Do not put secrets or image bytes in `details`. |
 
-The application must enforce the cross-row camera/revision identity check transactionally; use a composite foreign key or a guarded insert so `predictions.spot_id` cannot disagree with `polygon_revisions.spot_id`, and the spot's camera cannot disagree with the snapshot camera. `polygon_revisions` and `reviews` must not be updated or deleted through the API. Set foreign-key delete behavior to restrict historical deletion; disabling a spot or user preserves provenance.
+The `predictions.camera_id` column duplicates the snapshot/spot camera ID solely to support composite foreign keys. These enforce matching prediction-to-snapshot camera, prediction-to-spot camera, and prediction-to-revision spot at the database level. All historical foreign keys use `ON DELETE RESTRICT`; disabling a spot or user preserves provenance. The application must expose no update/delete route for polygon revisions, original predictions, reviews, or audit events. SQLAlchemy validates polygon coordinates, area, distinctness and self-intersection on ORM and Core writes; direct SQL clients must follow the same contract. A database-level polygon shape constraint is not yet present.
 
 ## Status and confidence constraints
 
