@@ -116,6 +116,18 @@ cd ..
 
 The script reads `PKLOT_DATASET_ROOT` or defaults to `ai/data/raw/PKLot/`. It writes ignored manifests, split counts, and visual ROI samples under `ai/data/processed/pklot/`. See [dataset preparation details](docs/DATASET.md#roi-preparation-and-leakage-safe-manifests-task-05). The three-image archive sample is insufficient for this step; use an extracted dataset with at least three independent capture-day groups. No model is trained.
 
+## Train and evaluate the PKLot classifier
+
+After preparing full, validated PKLot manifests, run from `ai/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e '.[audit,train,dev]'
+.\.venv\Scripts\python.exe .\scripts\train.py --config .\configs\train.yaml --device auto
+.\.venv\Scripts\python.exe .\scripts\evaluate.py --checkpoint .\runs\pklot\best.pt --device auto
+```
+
+For a dependency and pipeline check without real data or pretrained weight download, run `.\.venv\Scripts\python.exe .\scripts\train.py --smoke --device cpu`. Its output is explicitly synthetic and is not a PKLot model result. See [training and evaluation details](docs/TRAINING.md) for configuration, path overrides, Windows/Kaggle use, metrics, baseline, and saved artifacts.
+
 ## Configuration and data
 
 In development (the default), the backend loads the root `.env` file and process environment variables override it. Set `CORS_ORIGINS` to a JSON array of exact browser origins, such as `["http://localhost:5173"]`; an empty list allows no cross-origin requests. For production, set `APP_ENV=production` and supply `DATABASE_URL` and any `CORS_ORIGINS` through process environment variables. Production ignores the local `.env` file and requires `DATABASE_URL` at startup. Never commit `.env` files, secrets, datasets, checkpoints, or other large model artifacts. Keep ground truth, model predictions, and human review data separate in future workflows.

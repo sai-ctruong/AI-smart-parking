@@ -1,0 +1,19 @@
+{
+  "dataset_root": null,
+  "manifest_dir": null,
+  "output_dir": null,
+  "seed": 42,
+  "epochs": 20,
+  "batch_size": 32,
+  "num_workers": 0,
+  "learning_rate": 0.0003,
+  "weight_decay": 0.01,
+  "scheduler_factor": 0.5,
+  "scheduler_patience": 2,
+  "patience": 5,
+  "near_duplicate_hamming": 4,
+  "image_size": 224,
+  "pretrained": true,
+  "mixed_precision": true,
+  "device": "auto"
+}
