@@ -22,7 +22,6 @@
 | ID | Question and needed resolution | Owner/gate |
 | --- | --- | --- |
 | OPEN-01 | Is there an approved SRS/WBS elsewhere, and does it change this MVP scope, terminology, or acceptance criteria? | Project owner; reconcile all six documents before declaring a baseline. |
-| OPEN-02 | What exact one-time Admin bootstrap command and secret supply mechanism will be used? No default password or public registration is allowed. | Auth implementation design. |
 | OPEN-03 | Where will private images live in production, what are backup/retention/deletion rules, and how are staged file writes reconciled with DB transactions? | Deployment/storage design. |
 | OPEN-04 | What validated model artifact and version will be deployed, what confidence threshold is justified, and what evaluation protocol prevents PKLot train/validation/test leakage? No metrics may be invented. | AI task before claiming classification quality. |
 | OPEN-05 | What maximum upload bytes, image dimensions, inference timeout, and concurrency are feasible on target hardware? | Measure during implementation; configure positive limits. |
@@ -30,6 +29,8 @@
 | OPEN-07 | Are duplicate uploads allowed? If not, define idempotency key/hash policy and behavior under concurrent geometry edits or reviews. | API/database implementation. |
 | OPEN-08 | Are polygon self-intersections always rejected, and what pixel rounding/masking convention will match overlay and ROI extraction? | Geometry implementation, with fixtures. |
 | OPEN-09 | Is bearer-token-in-memory adequate for deployment, or is a secure-cookie/CSRF design required? Define login throttling and token signing/rotation policy. | Security review before production use. |
+
+OPEN-02 is resolved in [AUTH.md](AUTH.md): a local, one-time `app.bootstrap_admin` command prompts for the initial password, and `AUTH_SECRET_KEY` comes from environment configuration. There is no default account password or public registration.
 
 ## Risks and controls
 

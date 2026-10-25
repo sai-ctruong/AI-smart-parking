@@ -1,6 +1,6 @@
 # MVP data model — migrated schema
 
-**Status:** Schema implemented by Alembic `0002_smart_parking_schema` after the empty `0001_initial` baseline. This does not imply approval of the draft [SRS.md](SRS.md) or implementation of feature routes. IDs are UUIDs, and PostgreSQL stores timestamp columns as timezone-aware `timestamptz`. Application code must supply UTC timestamps.
+**Status:** Schema implemented by Alembic `0002_smart_parking_schema` and `0003_user_token_version` after the empty `0001_initial` baseline. This does not imply approval of the draft [SRS.md](SRS.md) or implementation of all feature routes. IDs are UUIDs, and PostgreSQL stores timestamp columns as timezone-aware `timestamptz`. Application code must supply UTC timestamps.
 
 ```mermaid
 erDiagram
@@ -22,7 +22,7 @@ erDiagram
 
 | Table | Key fields and constraints | Purpose |
 | --- | --- | --- |
-| `users` | `id` PK; `username` unique; `password_hash`; `role` enum `admin/operator`; `is_active`; `created_at` | Local accounts. Never store plaintext password or token. |
+| `users` | `id` PK; `username` unique; `password_hash`; `role` enum `admin/operator`; `is_active`; `token_version`; `created_at` | Local accounts. Password reset increments `token_version` so old JWTs fail; never store plaintext password or token. |
 | `parking_lots` | `id` PK; `name`; `singleton_key` unique constrained to `true` | Exactly one operational lot row for MVP. Provisioned by setup, not a public create route. |
 | `cameras` | `id` PK; `parking_lot_id` FK unique; `name`; `is_active` | Exactly one fixed camera for that lot. No live capture integration in MVP. |
 | `parking_spots` | `id` PK; `camera_id` FK; `code` unique per camera; `is_active`; `created_at` | Stable spot identity; disabling affects future snapshots only. |

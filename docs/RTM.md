@@ -1,11 +1,11 @@
 # Requirements traceability matrix — MVP draft
 
-**Status:** Planned coverage, not test results. The requirement baseline is [SRS.md](SRS.md); schemas are in [API_SPEC.md](API_SPEC.md), persistence design in [ERD.md](ERD.md), and implementation boundaries in [SDS.md](SDS.md). No MVP feature test listed below exists yet.
+**Status:** Draft traceability. The requirement baseline is [SRS.md](SRS.md); schemas are in [API_SPEC.md](API_SPEC.md), persistence design in [ERD.md](ERD.md), and implementation boundaries in [SDS.md](SDS.md). TASK-09 adds auth/account tests in `backend/tests/test_auth.py`; other MVP feature tests remain planned.
 
 | MUST ID | Proposed design/contract | Planned verification ID and decisive assertion | Current status |
 | --- | --- | --- | --- |
-| MVP-01 | Login, user/token in API spec | T-MVP-01: correct login succeeds; wrong username/password share 401 shape; expired/disabled user denied. | Not implemented |
-| MVP-02 | SDS permission matrix, API roles | T-MVP-02: Operator gets 403 on user/spot writes; anonymous gets 401; Admin succeeds. | Not implemented |
+| MVP-01 | Login, user/token in API spec | T-MVP-01: correct login succeeds; wrong username/password share 401 shape; expired/disabled user denied. | Implemented for current routes; `backend/tests/test_auth.py` |
+| MVP-02 | SDS permission matrix, API roles | T-MVP-02: Operator gets 403 on user/spot writes; anonymous gets 401; Admin succeeds. | Partial: user routes guarded and tested; spot routes pending |
 | MVP-03 | Singleton lot/camera ERD, camera-bound upload | T-MVP-03: one configured lot/camera; foreign camera upload rejected; snapshot keeps camera ID. | Not implemented |
 | MVP-04 | Revisioned polygons in ERD/API | T-MVP-04: reject out-of-range, repeated, zero-area, self-intersecting points; edit adds revision; old prediction keeps prior revision. | Not implemented |
 | MVP-05 | Multipart upload and private original storage | T-MVP-05: JPEG/PNG accepted byte-for-byte; corrupt/wrong format/oversize rejected; image route requires auth. | Not implemented |
@@ -20,12 +20,12 @@
 | MVP-14 | Append-only review, effective status | T-MVP-14: review changes effective result and counts, original prediction unchanged; later review wins with tie-breaker. | Not implemented |
 | MVP-15 | CSV endpoint/columns | T-MVP-15: filtered export has exact header/order, original and reviewed status, provenance, authenticated access, safe CSV quoting. | Not implemented |
 | MVP-16 | Error envelope and validation | T-MVP-16: 401/403/404/409/413/415/422/428/503 use stable codes, safe messages, request ID; rejected upload leaves no row. | Not implemented |
-| MVP-17 | Hashing, access control, ignored artifacts | T-MVP-17: password hash differs from input; image/export unauthorized access fails; secret/data paths ignored by Git. | Not implemented |
+| MVP-17 | Hashing, access control, ignored artifacts | T-MVP-17: password hash differs from input; image/export unauthorized access fails; secret/data paths ignored by Git. | Partial: Argon2, auth/RBAC tests; image/export routes pending |
 | MVP-18 | Ground truth/provenance separation | T-MVP-18: inference fixture cannot read PKLot XML; prediction and review rows are distinct; export labels original/effective explicitly. | Not implemented |
 
 ## Existing baseline checks
 
-`backend/tests/test_health.py`, `backend/tests/test_database_health.py`, `backend/tests/test_configuration.py`, and `backend/tests/test_migrations.py` exercise the existing health/config/database skeleton. `ai/tests/test_dataset_audit.py` checks offline PKLot XML/image validation and polygon overlay generation. `frontend` currently has lint/format/build checks but no MVP UI tests. These checks support the foundation; they do **not** satisfy T-MVP-01 through T-MVP-18.
+`backend/tests/test_auth.py` covers T-MVP-01 and the user-account part of T-MVP-02/T-MVP-17. Health/config/database/schema tests cover the foundation; `ai/tests/test_dataset_audit.py` covers offline PKLot validation. Frontend has lint/format/build checks but no MVP UI tests. Remaining partial/planned rows are not accepted by these checks alone.
 
 ## Exit rule
 

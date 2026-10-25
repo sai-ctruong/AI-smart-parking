@@ -1,6 +1,6 @@
 # Database schema setup (TASK-08)
 
-The SQLAlchemy 2.x models live in `backend/app/models.py`. Alembic migration `0002_smart_parking_schema` adds the nine persistence tables documented in [ERD.md](ERD.md), including `polygon_revisions` so a prediction retains the exact geometry used at inference time. `0001_initial` remains the empty baseline. This schema creates no users, lots, cameras, images, or predictions by itself.
+The SQLAlchemy 2.x models live in `backend/app/models.py`. Alembic migration `0002_smart_parking_schema` adds the nine persistence tables documented in [ERD.md](ERD.md), including `polygon_revisions` so a prediction retains the exact geometry used at inference time. `0003_user_token_version` adds account token revocation state. `0001_initial` remains the empty baseline. These migrations create no users, lots, cameras, images, or predictions by themselves.
 
 For local PostgreSQL 16, configure the ignored root `.env` with `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `DATABASE_URL` as described in the root README. From the repository root in PowerShell:
 

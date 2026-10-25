@@ -7,9 +7,9 @@
 | Concern | Verified repository evidence | Proposed MVP addition |
 | --- | --- | --- |
 | Web UI | `frontend/src/App.tsx` is a placeholder React page. | Authenticated lot view, polygon editor, upload, overlay, history/review/export. |
-| HTTP API | `backend/app/main.py` exposes only `/health`; CORS currently permits GET. | Versioned `/api/v1` routes, request validation, backend RBAC, image-serving and CSV responses; extend CORS methods as required. |
-| Configuration | `backend/app/config.py` separates development `.env` from production process variables. | Token signing key, private image root, upload limit, confidence threshold and staleness threshold, with startup validation. |
-| Database | `backend/app/db.py` supplies lazy SQLAlchemy engine/session; `backend/app/models.py` and Alembic `0002_smart_parking_schema` define the MVP tables and constraints. | Transactional feature services and routes; PostgreSQL deployment verification. |
+| HTTP API | `backend/app/main.py` exposes `/health` and versioned auth/user routes from `backend/app/auth.py`; backend dependencies enforce Admin account-management access. CORS allows configured origins for GET/POST/PATCH. | Camera/spot, image-serving, review, and CSV routes with their required backend roles. |
+| Configuration | `backend/app/config.py` separates development `.env` from production process variables and reads the token secret/TTL. | Private image root, upload limit, confidence threshold and staleness threshold, with startup validation. |
+| Database | `backend/app/db.py` supplies lazy sessions; `backend/app/models.py` and Alembic through `0003_user_token_version` define tables and token revocation state. | Transactional feature services and routes; PostgreSQL deployment verification. |
 | AI | `ai/src/smart_parking_ai/dataset_audit.py` validates PKLot ground truth; `ai/src/inference/predictor.py` provides standalone checkpoint inference. | Backend inference integration with versioned operational output; dataset-audit XML never enters the operational API. |
 | PostgreSQL | `infrastructure/compose.yaml` provides local PostgreSQL 16 with a persistent volume. | Production database provisioning/backup policy remains separate. |
 

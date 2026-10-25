@@ -1,6 +1,6 @@
 # API contract — proposed MVP v1
 
-**Status:** Draft. These `/api/v1` endpoints do not exist yet. The only implemented route is `GET /health` in `backend/app/main.py`: `200 {"status":"ok"}`, or with `?check_db=true`, `200 {"status":"ok","database":"ready"}` / `503 {"detail":"..."}`. That existing route retains its current response shape until explicitly versioned. The contracts below are for future implementation and must be reviewed against an approved SRS if one appears.
+**Status:** Draft MVP contract. The auth and user-account routes below are implemented in `backend/app/auth.py`; other `/api/v1` feature routes remain proposed. `GET /health` keeps its existing response shape. This document is not proof of approved SRS scope. See [AUTH.md](AUTH.md) for setup and current security boundaries.
 
 ## Common rules
 
@@ -17,6 +17,9 @@
 | `POST /api/v1/auth/login` | Public | JSON `username`, `password` | 200 token response; 401 on invalid credentials. |
 | `GET /api/v1/auth/me` | Admin/Operator | None | 200 user summary. |
 | `POST /api/v1/users` | Admin | JSON `username`, `password`, `role` | 201 user summary; 409 duplicate username. |
+| `GET /api/v1/users` | Admin | None | 200 `{ "items": [<user summaries>] }`. |
+| `PATCH /api/v1/users/{user_id}` | Admin | JSON `role` and/or `is_active` | 200 user summary; cannot disable/demote last active Admin. |
+| `POST /api/v1/users/{user_id}/password` | Admin | JSON `password` | 200 user summary; old tokens are invalidated. |
 | `GET /api/v1/lots/current` | Admin/Operator | None | 200 single lot summary. |
 | `GET /api/v1/cameras/current` | Admin/Operator | None | 200 fixed camera summary. |
 | `GET /api/v1/spots` | Admin/Operator | None | 200 list of spots and current revisions. |
@@ -33,7 +36,7 @@
 | `GET /api/v1/predictions/{prediction_id}/reviews` | Admin/Operator | None | 200 chronological review history. |
 | `GET /api/v1/snapshots/export.csv` | Admin/Operator | Optional `from`/`to` | 200 UTF-8 CSV with one row per prediction; no history mutation. |
 
-The export route must be registered before the dynamic `/{snapshot_id}` route. An initial Admin account is created through a local bootstrap mechanism, never public registration; its exact command is an open decision in [DECISIONS.md](DECISIONS.md).
+The export route must be registered before the dynamic `/{snapshot_id}` route. The initial Admin is created locally with `python -m app.bootstrap_admin --username <name>` after migration; the password is entered at a hidden prompt. No public registration exists. Camera/spot write routes remain unimplemented and must use the backend Admin dependency when added.
 
 ## Request and response shapes
 
