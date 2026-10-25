@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.auth import ApiError
 from app.auth import router as auth_router
 from app.config import AppSettings, MissingDatabaseConfiguration, get_settings
+from app.configuration import router as configuration_router
 from app.db import check_database
 
 
@@ -22,7 +23,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     api.add_middleware(
         CORSMiddleware,
         allow_origins=configured.cors_origins,
-        allow_methods=["GET", "POST", "PATCH"],
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
         allow_headers=["*"],
     )
 
@@ -66,6 +67,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
         )
 
     api.include_router(auth_router)
+    api.include_router(configuration_router)
 
     @api.get("/health")
     def health(check_db: bool = False) -> dict[str, str]:

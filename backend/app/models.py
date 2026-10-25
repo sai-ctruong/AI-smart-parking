@@ -148,6 +148,14 @@ class Camera(Base):
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
+    reference_image_sha256: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    reference_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reference_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    viewpoint_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -193,6 +201,12 @@ class PolygonRevision(Base):
     )
     revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
     points: Mapped[list[dict]] = mapped_column(NormalizedPolygon, nullable=False)
+    reference_image_sha256: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    reference_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reference_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    camera_viewpoint_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_by: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )

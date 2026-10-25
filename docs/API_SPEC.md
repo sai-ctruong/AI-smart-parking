@@ -1,6 +1,6 @@
 # API contract — proposed MVP v1
 
-**Status:** Draft MVP contract. The auth and user-account routes below are implemented in `backend/app/auth.py`; other `/api/v1` feature routes remain proposed. `GET /health` keeps its existing response shape. This document is not proof of approved SRS scope. See [AUTH.md](AUTH.md) for setup and current security boundaries.
+**Status:** Draft MVP contract. Authentication and user-account routes are implemented in `backend/app/auth.py`; lot, camera, and spot configuration routes are implemented in `backend/app/configuration.py`. Snapshot, prediction, review, statistics, and export routes remain proposed. `GET /health` keeps its existing response shape. This document is not proof of approved SRS scope. See [AUTH.md](AUTH.md) for security and [CONFIGURATION.md](CONFIGURATION.md) for working configuration examples.
 
 ## Common rules
 
@@ -20,12 +20,21 @@
 | `GET /api/v1/users` | Admin | None | 200 `{ "items": [<user summaries>] }`. |
 | `PATCH /api/v1/users/{user_id}` | Admin | JSON `role` and/or `is_active` | 200 user summary; cannot disable/demote last active Admin. |
 | `POST /api/v1/users/{user_id}/password` | Admin | JSON `password` | 200 user summary; old tokens are invalidated. |
-| `GET /api/v1/lots/current` | Admin/Operator | None | 200 single lot summary. |
-| `GET /api/v1/cameras/current` | Admin/Operator | None | 200 fixed camera summary. |
-| `GET /api/v1/spots` | Admin/Operator | None | 200 list of spots and current revisions. |
-| `POST /api/v1/spots` | Admin | JSON `code`, `points` | 201 spot with revision 1; 409 duplicate code. |
-| `PUT /api/v1/spots/{spot_id}/polygon` | Admin | JSON `points`, header `If-Match: "<revision_no>"` | 200 spot with next revision; 409 on stale revision. |
-| `PATCH /api/v1/spots/{spot_id}` | Admin | JSON `is_active` | 200 updated spot; historical snapshots remain unchanged. |
+| `POST /api/v1/lots` | Admin | JSON `name` | 201 lot; 409 if MVP singleton exists. |
+| `GET /api/v1/lots/current`, `GET /api/v1/lots/{lot_id}` | Admin/Operator | None | 200 lot; 404 if absent. |
+| `PATCH /api/v1/lots/{lot_id}` | Admin | JSON `name` | 200 updated lot. |
+| `DELETE /api/v1/lots/{lot_id}` | Admin | None | 204 if no camera; otherwise 409. |
+| `POST /api/v1/lots/{lot_id}/cameras` | Admin | JSON `name`, `reference_image` | 201 fixed camera; 409 if lot already has one. |
+| `GET /api/v1/cameras/current`, `GET /api/v1/cameras/{camera_id}` | Admin/Operator | None | 200 camera; 404 if absent. |
+| `PATCH /api/v1/cameras/{camera_id}` | Admin | JSON `name`, `is_active`, and/or `reference_image`; `invalidate_spots` required when changing reference with existing spots | 200 camera; 409 if geometry would be silently reused. |
+| `DELETE /api/v1/cameras/{camera_id}` | Admin | None | 204 if no spots or snapshots; otherwise 409. |
+| `GET /api/v1/spots`, `GET /api/v1/cameras/{camera_id}/spots` | Admin/Operator | None | 200 `{ "items": [<spot>] }`. |
+| `POST /api/v1/cameras/{camera_id}/spots` | Admin | JSON `code`, `points` | 201 spot with polygon revision 1. |
+| `PUT /api/v1/cameras/{camera_id}/spots/bulk` | Admin | JSON `items` of up to 100 objects with optional `id`, `code`, `points` | 200 atomic upsert with `items` and overlap `warnings`; existing `id` is retained. |
+| `GET /api/v1/spots/{spot_id}`, `GET /api/v1/spots/{spot_id}/revisions` | Admin/Operator | None | 200 spot or ordered immutable polygon revisions. |
+| `PUT /api/v1/spots/{spot_id}/polygon` | Admin | JSON `points`, header `If-Match: "<revision_no>"` | 200 spot with replacement revision; 409 on stale revision. |
+| `PATCH /api/v1/spots/{spot_id}` | Admin | JSON `code` and/or `is_active` | 200 updated spot; stale geometry cannot be reactivated. |
+| `DELETE /api/v1/spots/{spot_id}` | Admin | None | 204 soft deactivation; spot ID and history remain. |
 | `POST /api/v1/cameras/{camera_id}/snapshots` | Admin/Operator | Multipart `file` JPEG/PNG, optional `captured_at` UTC | 201 snapshot detail with predictions; 404 for a camera other than the configured one. |
 | `GET /api/v1/snapshots` | Admin/Operator | `page`, `page_size`, optional `from`/`to` | 200 paginated history. |
 | `GET /api/v1/snapshots/{snapshot_id}` | Admin/Operator | None | 200 snapshot detail, predictions, latest reviews, counts. |
@@ -36,7 +45,7 @@
 | `GET /api/v1/predictions/{prediction_id}/reviews` | Admin/Operator | None | 200 chronological review history. |
 | `GET /api/v1/snapshots/export.csv` | Admin/Operator | Optional `from`/`to` | 200 UTF-8 CSV with one row per prediction; no history mutation. |
 
-The export route must be registered before the dynamic `/{snapshot_id}` route. The initial Admin is created locally with `python -m app.bootstrap_admin --username <name>` after migration; the password is entered at a hidden prompt. No public registration exists. Camera/spot write routes remain unimplemented and must use the backend Admin dependency when added.
+The export route must be registered before the dynamic `/{snapshot_id}` route when implemented. The initial Admin is created locally with `python -m app.bootstrap_admin --username <name>` after migration; the password is entered at a hidden prompt. No public registration exists. All configuration writes use the backend Admin dependency.
 
 ## Request and response shapes
 
@@ -46,15 +55,15 @@ Login request: `{"username":"operator1","password":"<entered secret>"}`. Success
 {"access_token":"<opaque-to-client bearer token>","token_type":"bearer","expires_in":900}
 ```
 
-User summary: `{"id":"<uuid>","username":"operator1","role":"operator","is_active":true}`. Passwords and hashes never appear in a response. Lot summary: `{"id":"<uuid>","name":"Main lot","camera_id":"<uuid>"}`. Camera summary: `{"id":"<uuid>","lot_id":"<uuid>","name":"Fixed camera","is_active":true}`. Names are examples, not seeded values.
+User summary: `{"id":"<uuid>","username":"operator1","role":"operator","is_active":true}`. Passwords and hashes never appear in a response. Lot response contains `id`, `name`, `created_at`. Camera response contains `id`, `parking_lot_id`, `name`, `is_active`, `viewpoint_version`, `reference_image`, `created_at`. Names are examples, not seeded values.
 
-Spot create body and returned geometry (returned object also contains `id`, `camera_id`, `is_active`, `revision_no`, `created_at`):
+Spot create body:
 
 ```json
 {"code":"A01","points":[{"x":0.1,"y":0.2},{"x":0.2,"y":0.2},{"x":0.2,"y":0.3}]}
 ```
 
-`GET /spots` returns `{"items":[<spot objects>]}`. `PUT /spots/{id}/polygon` replaces all points and increments `revision_no`; `If-Match` must equal the current quoted decimal revision. Missing precondition returns 428, stale precondition returns 409. `PATCH` accepts only `is_active`; disabling excludes the spot from later snapshots but not prior prediction rows.
+The spot response contains `id`, `camera_id`, `code`, `is_active`, `geometry_status`, nested `polygon`, and `created_at`. The nested polygon contains `id`, `revision_no`, `points`, `reference_image`, `camera_viewpoint_version`, `created_by`, and `created_at`. `geometry_status` is `current`, `needs_recalibration`, or `legacy_missing` for rows created before the reference-image migration. `PUT /spots/{id}/polygon` appends a revision when geometry or the camera reference changes; `If-Match` must equal the current quoted decimal revision. Missing precondition returns 428, stale precondition returns 409. Soft deactivation excludes a spot from later snapshots but preserves prior prediction rows. Bulk upsert is atomic, normalizes codes to uppercase, rejects duplicate codes and identical active polygons, and reports intersecting polygons in `warnings` without discarding them. Single-spot create and polygon replace reject overlap with another current active spot using `422 OVERLAPPING_POLYGON`; shared edges alone do not count. All coordinates are relative to the declared reference image; a polygon under four pixels in that image is rejected.
 
 Successful upload returns the snapshot detail schema below. The server captures `camera_id` from the path, stores `uploaded_by`, and returns one prediction per active spot. The original file is private. A missing model still yields 201 with `unknown` results, null confidence/version, and `reason_code: "MODEL_UNAVAILABLE"` for each spot; no PKLot annotation is substituted.
 
@@ -96,11 +105,11 @@ All new `/api/v1` errors use `{"error":{"code":"<STABLE_CODE>","message":"Human-
 | 401 | `UNAUTHENTICATED` | Missing, expired, or invalid token; invalid login credentials. |
 | 403 | `FORBIDDEN` | Authenticated role lacks permission. |
 | 404 | `NOT_FOUND` | Unknown or inaccessible camera, spot, snapshot, or prediction. |
-| 409 | `CONFLICT` / `REVISION_CONFLICT` | Duplicate unique value or stale polygon revision. |
+| 409 | `CONFLICT` / `REVISION_CONFLICT` / `VIEWPOINT_CONFLICT` / `REFERENCE_REQUIRED` | Duplicate unique value, stale polygon revision, or camera reference change requiring geometry invalidation/recalibration. |
 | 413 | `PAYLOAD_TOO_LARGE` | Upload exceeds configured byte limit. |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Upload is not a decoded JPEG or PNG. |
-| 422 | `VALIDATION_ERROR` / `INVALID_IMAGE` | Invalid fields, polygon, date range, dimensions, or corrupt image. |
+| 422 | `VALIDATION_ERROR` / `INVALID_POLYGON` / `OVERLAPPING_POLYGON` / `INVALID_IMAGE` | Invalid fields, polygon, overlapping single-spot change, date range, dimensions, or corrupt image. |
 | 428 | `PRECONDITION_REQUIRED` | Polygon update lacks `If-Match`. |
 | 503 | `SERVICE_UNAVAILABLE` | Database or private image storage unavailable; no accepted snapshot is reported. |
 
-On any error, a rejected upload creates no accepted snapshot. Internal request IDs support log correlation. Define the exact request-id middleware and size limit before implementing the API.
+On any error, a rejected upload creates no accepted snapshot. Implemented `/api/v1` routes include `X-Request-ID` on responses; the upload size limit remains to be defined before snapshot upload is built.

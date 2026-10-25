@@ -16,6 +16,7 @@
 | ADR-08 | Accept upload synchronously and return snapshot plus predictions. | Small MVP contract without a job queue. Inference timeout/throughput limits must be measured before implementation. | Proposed |
 | ADR-09 | If no model runs, write per-spot unknown results with null confidence/version and a reason. | Snapshot remains reviewable without fabricating a model verdict or using PKLot XML as output. | Proposed |
 | ADR-10 | Use the latest `(captured_at, uploaded_at, id)` snapshot and evaluate STALE against `captured_at`. | Gives deterministic ordering and ties alert freshness to when the scene was captured. | Proposed |
+| ADR-11 | Record camera reference-image SHA-256/dimensions and copy them plus viewpoint version into each polygon revision. Require explicit invalidation when Admin changes reference; deactivate old spots until recalibrated. | Prevents a viewpoint change from silently reusing geometry and preserves historical identity. The API currently trusts Admin-supplied metadata; image-byte verification is pending image upload/storage work. | Implemented in TASK-10; production image verification open |
 
 ## Open decisions before feature implementation
 
