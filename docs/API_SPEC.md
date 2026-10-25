@@ -1,6 +1,6 @@
 # API contract — proposed MVP v1
 
-**Status:** Draft MVP contract. Authentication and user-account routes are implemented in `backend/app/auth.py`; lot, camera, and spot configuration routes are implemented in `backend/app/configuration.py`; snapshot predict/detail/private-image and current occupancy routes are implemented in `backend/app/snapshots.py`. Review, derived overlay, paginated history and export routes remain proposed. `GET /health` keeps its existing response shape. This document is not proof of approved SRS scope. See [AUTH.md](AUTH.md), [CONFIGURATION.md](CONFIGURATION.md) and [SNAPSHOT_INFERENCE.md](SNAPSHOT_INFERENCE.md) for implemented setup and examples.
+**Status:** Draft MVP contract. Authentication and user-account routes are implemented in `backend/app/auth.py`; lot, camera, and spot configuration routes are implemented in `backend/app/configuration.py`; snapshot predict/detail/private-image and current occupancy routes are implemented in `backend/app/snapshots.py`; history, review and CSV routes are implemented in `backend/app/operations.py`. A derived overlay image route remains proposed. `GET /health` keeps its existing response shape. This document is not proof of approved SRS scope. See [AUTH.md](AUTH.md), [CONFIGURATION.md](CONFIGURATION.md), [SNAPSHOT_INFERENCE.md](SNAPSHOT_INFERENCE.md) and [OPERATIONS.md](OPERATIONS.md) for implemented setup and examples.
 
 ## Common rules
 
@@ -36,14 +36,14 @@
 | `PATCH /api/v1/spots/{spot_id}` | Admin | JSON `code` and/or `is_active` | 200 updated spot; stale geometry cannot be reactivated. |
 | `DELETE /api/v1/spots/{spot_id}` | Admin | None | 204 soft deactivation; spot ID and history remain. |
 | `POST /api/v1/snapshots/predict` | Admin/Operator | Multipart `file` JPEG/PNG, `camera_id`, optional timezone-aware `captured_at` | 201 snapshot with predictions and coordinates; unavailable model yields explicit unknown rows. |
-| `GET /api/v1/snapshots` | Admin/Operator | `page`, `page_size`, optional `from`/`to` | 200 paginated history. |
+| `GET /api/v1/snapshots` | Admin/Operator | `page`, `page_size`, optional `camera_id`, `from`/`to` | 200 paginated history. |
 | `GET /api/v1/snapshots/{snapshot_id}` | Admin/Operator | None | 200 stored original predictions, captured polygons and current effective counts. |
 | `GET /api/v1/snapshots/{snapshot_id}/image` | Admin/Operator | None | 200 original image bytes with its validated media type and SHA-256 integrity check. |
 | `GET /api/v1/snapshots/{snapshot_id}/overlay` | Admin/Operator | None | 200 derived PNG; polygons colored by effective status (empty green, occupied red, unknown amber) and legend. |
 | `GET /api/v1/lots/current/occupancy` | Admin/Operator | None | 200 latest effective counts, threshold and `alert_state`. |
 | `POST /api/v1/predictions/{prediction_id}/reviews` | Admin/Operator | JSON `reviewed_status`, optional `note` | 201 append-only review; re-read counts to see current effective state. |
 | `GET /api/v1/predictions/{prediction_id}/reviews` | Admin/Operator | None | 200 chronological review history. |
-| `GET /api/v1/snapshots/export.csv` | Admin/Operator | Optional `from`/`to` | 200 UTF-8 CSV with one row per prediction; no history mutation. |
+| `GET /api/v1/snapshots/export.csv` | Admin/Operator | Optional `camera_id`, `from`/`to` | 200 UTF-8 CSV with one row per prediction; no history mutation. |
 
 The export route must be registered before the dynamic `/{snapshot_id}` route when implemented. The initial Admin is created locally with `python -m app.bootstrap_admin --username <name>` after migration; the password is entered at a hidden prompt. No public registration exists. All configuration writes use the backend Admin dependency.
 
@@ -84,6 +84,11 @@ Successful upload returns the snapshot prediction schema below (selected fields 
     "prediction_id": "<prediction-uuid>", "spot_id": "<spot-uuid>",
     "polygon_revision_id": "<revision-uuid>",
     "predicted_status": "unknown",
+    "effective_status": "unknown",
+    "review_version": 0,
+    "latest_review_id": null,
+    "latest_reviewed_by": null,
+    "latest_reviewed_at": null,
     "confidence": null, "model_version": null,
     "reason_code": "MODEL_UNAVAILABLE",
     "polygon": [{"x": 0.1, "y": 0.2}, {"x": 0.2, "y": 0.2}, {"x": 0.2, "y": 0.3}]
@@ -91,13 +96,13 @@ Successful upload returns the snapshot prediction schema below (selected fields 
 }
 ```
 
-`POST /predictions/{id}/reviews` accepts, for example, `{"reviewed_status":"occupied","note":"Vehicle visible"}` and returns `{"id":"<uuid>","prediction_id":"<uuid>","reviewed_status":"occupied","note":"Vehicle visible","reviewed_by":"<user-uuid>","reviewed_at":"2026-10-25T08:05:00Z"}`. The prediction's original fields stay unchanged. `GET .../reviews` returns `{"items":[<review objects>]}` in ascending `(reviewed_at,id)` order.
+`POST /predictions/{id}/reviews` requires `If-Match: "0"` for an unreviewed prediction, or the current quoted `review_version`. It accepts, for example, `{"reviewed_status":"occupied","note":"Vehicle visible"}` and returns `id`, `prediction_id`, `revision_no`, `reviewed_status`, `note`, `reviewed_by`, and `reviewed_at`. The original prediction stays unchanged. Missing precondition returns 428; a stale version returns 409 `REVIEW_CONFLICT` with no new review/audit row. A conditional database update serializes competing reviews so only one writer can advance a given version. `GET .../reviews` returns `{"items":[<review objects>]}` in ascending `revision_no` order. Reviews are append-only; the latest revision determines effective status.
 
-The **proposed** paginated history endpoint returns `{"items":[<snapshot summaries>],"page":1,"page_size":25,"total_items":<integer>}`. Its final summary schema and review fields remain to be implemented. `GET /snapshots/{id}` currently returns the stored original predictions and polygon coordinates, with counts recalculated from the latest reviews if such rows exist.
+The implemented paginated history endpoint returns `{"items":[<snapshot summaries>],"page":1,"page_size":25,"total_items":<integer>}`. Each summary includes snapshot/camera IDs, capture/upload time, total and effective empty/occupied/unknown counts, occupancy percentage, model version, number of reviewed spots and read-time alert state. Ordering is `(captured_at, uploaded_at, id)` descending. `GET /snapshots/{id}` returns stored original predictions and captured polygons; each prediction also exposes `effective_status`, `review_version`, and latest review identity/time, with effective counts recalculated from reviews.
 
 Occupancy response contains `snapshot_id` (nullable), `camera_id`, `captured_at` (nullable), `as_of` (server UTC), `stale_after_seconds`, `counts` (nullable object with `total`, `empty`, `occupied`, `unknown`, `available_confirmed`, `occupancy_percent`), and singular `alert_state` (`NONE`, `FULL`, or `STALE`). If no snapshot exists, counts are null and state is `STALE`. With any unknown result, counts include it and `FULL` is absent. `FULL` requires at least one captured spot. `STALE` takes precedence when the latest acquired image is strictly older than the configured threshold.
 
-CSV columns, in order: `snapshot_id,camera_id,captured_at,uploaded_at,spot_id,polygon_revision_id,prediction_status,effective_status,confidence,model_version,reason_code,inferred_at,latest_review_id,latest_reviewed_by,latest_reviewed_at`. Null values are empty fields. A snapshot with zero active spots yields no prediction row. CSV uses standard quoting and guards spreadsheet-formula injection in free-text fields; this export currently contains no review note or username. `Content-Disposition` uses a fixed safe filename.
+CSV columns, in order: `snapshot_id,camera_id,captured_at,uploaded_at,spot_id,polygon_revision_id,prediction_status,effective_status,confidence,model_version,reason_code,inferred_at,latest_review_id,latest_reviewed_by,latest_reviewed_at`. Null values are empty fields. A snapshot with zero active spots yields no prediction row. CSV uses standard quoting and guards spreadsheet-formula injection in exported cells; this export contains no review note or username. `Content-Disposition` uses a fixed safe filename.
 
 ## Error conventions
 
@@ -109,7 +114,7 @@ All new `/api/v1` errors use `{"error":{"code":"<STABLE_CODE>","message":"Human-
 | 401 | `UNAUTHENTICATED` | Missing, expired, or invalid token; invalid login credentials. |
 | 403 | `FORBIDDEN` | Authenticated role lacks permission. |
 | 404 | `NOT_FOUND` | Unknown or inaccessible camera, spot, snapshot, or prediction. |
-| 409 | `CONFLICT` / `REVISION_CONFLICT` / `VIEWPOINT_CONFLICT` / `REFERENCE_REQUIRED` | Duplicate unique value, stale polygon revision, or camera reference change requiring geometry invalidation/recalibration. |
+| 409 | `CONFLICT` / `REVISION_CONFLICT` / `REVIEW_CONFLICT` / `VIEWPOINT_CONFLICT` / `REFERENCE_REQUIRED` | Duplicate unique value, stale review/polygon revision, or camera reference change requiring geometry invalidation/recalibration. |
 | 413 | `PAYLOAD_TOO_LARGE` | Upload exceeds configured byte limit. |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Upload is not a decoded JPEG or PNG. |
 | 422 | `VALIDATION_ERROR` / `INVALID_POLYGON` / `OVERLAPPING_POLYGON` / `INVALID_IMAGE` | Invalid fields, polygon, overlapping single-spot change, date range, dimensions, or corrupt image. |

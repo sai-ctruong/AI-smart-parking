@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | ADR-01 | One lot and one fixed camera; manual snapshot upload. | Bounds the capstone scope and keeps camera capture integration outside MVP. Enforce singleton in data setup and API. | Proposed |
 | ADR-02 | Normalize spot geometry to `[0,1]` and keep immutable revisions. | Same geometry works for different image sizes; historical prediction evidence remains stable. | Proposed |
-| ADR-03 | Keep original prediction and append-only human reviews; compute effective status from latest review. | Avoids changing model evidence and supports audit/export. | Proposed |
+| ADR-03 | Keep original prediction and append-only human reviews; compute effective status from highest review revision. Require quoted `If-Match` and atomically advance `review_version` to resolve competing writes. | Avoids changing model evidence and supports deterministic audit/export. | Implemented in TASK-12; PostgreSQL concurrency validation pending |
 | ADR-04 | Use three statuses; unknown never counts as empty. | Prevents low-confidence or failed inference from overstating availability. Occupancy percentage is null when any spot is unknown. | Proposed |
 | ADR-05 | Derive FULL and STALE at read time instead of persisting alert rows. | Avoids state drift from review and clock changes. FULL requires fresh all-occupied evidence; STALE wins when old. | Proposed |
 | ADR-06 | Version `/api/v1`, use short-lived bearer tokens, and recheck current user/role in backend. | Simple SPA integration while preserving immediate disabled-user denial. Token storage in browser memory and login renewal need UX work. | Proposed |

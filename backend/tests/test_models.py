@@ -82,6 +82,7 @@ def test_migrated_schema_persists_relationships_and_review_provenance(engine) ->
             prediction_status="empty",
             confidence=0.82,
             model_version="sha256:model-v1",
+            review_version=1,
         )
         session.add(prediction)
         session.flush()
@@ -91,6 +92,7 @@ def test_migrated_schema_persists_relationships_and_review_provenance(engine) ->
                     prediction=prediction,
                     reviewer=admin,
                     reviewed_status="occupied",
+                    revision_no=1,
                     note="Vehicle visible",
                 ),
                 AuditLog(

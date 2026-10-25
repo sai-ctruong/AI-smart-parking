@@ -7,9 +7,9 @@
 | Concern | Verified repository evidence | Proposed MVP addition |
 | --- | --- | --- |
 | Web UI | `frontend/src/App.tsx` is a placeholder React page. | Authenticated lot view, polygon editor, upload, overlay, history/review/export. |
-| HTTP API | `backend/app/main.py` exposes `/health`, auth/user, lot/camera/spot configuration, and snapshot predict/detail/private-image/current-occupancy routes. Backend role dependencies protect all writes and image reads. CORS allows configured origins for GET/POST/PATCH/PUT/DELETE. | Review, derived overlay, paginated history, and CSV routes. |
+| HTTP API | `backend/app/main.py` exposes `/health`, auth/user, lot/camera/spot configuration, snapshot predict/detail/private-image/current-occupancy, history, review and CSV routes. Backend role dependencies protect writes and reads. CORS allows configured origins for GET/POST/PATCH/PUT/DELETE. | Derived overlay image route. |
 | Configuration | `backend/app/config.py` separates development `.env` from production process variables and validates token secret, private image root, upload/pixel limits, model settings and stale threshold. | Retention, backup and deployment tuning. |
-| Database | `backend/app/db.py` supplies lazy sessions; `backend/app/models.py` and Alembic through `0005_snapshot_processing_time` define operational tables and metadata. | Review services and PostgreSQL deployment verification. |
+| Database | `backend/app/db.py` supplies lazy sessions; `backend/app/models.py` and Alembic through `0006_review_versions` define operational tables and metadata. | PostgreSQL deployment verification. |
 | AI | `ai/src/inference/predictor.py` provides checkpoint inference; `backend/app/snapshots.py` invokes it lazily using captured polygons and stores versioned original predictions. Dataset-audit XML does not enter the operational API. | Evaluated PKLot checkpoint deployment and monitoring. |
 | PostgreSQL | `infrastructure/compose.yaml` provides local PostgreSQL 16 with a persistent volume. | Production database provisioning/backup policy remains separate. |
 
@@ -24,7 +24,7 @@ flowchart LR
   Inference -->|status, confidence, model version| API
 ```
 
-This is a **target** diagram. The React shell, FastAPI health/auth/configuration/snapshot services, private local original-image storage, optional AI predictor bridge, SQLAlchemy models and local PostgreSQL configuration are implemented. Derived overlay, reviews, paginated history and CSV are still absent. Do not use this Mermaid sketch as the final source-backed Archify diagram.
+This is a **target** diagram. The React shell, FastAPI health/auth/configuration/snapshot/history/review/CSV services, private local original-image storage, optional AI predictor bridge, SQLAlchemy models and local PostgreSQL configuration are implemented. A derived overlay image route is still absent. Do not use this Mermaid sketch as the final source-backed Archify diagram.
 
 The frontend never connects directly to PostgreSQL, the image store, or model artifacts. FastAPI authenticates and authorizes every operational request, owns all validation, and keeps storage paths private. An inference adapter accepts decoded image bytes and the immutable polygon revision selected for the snapshot, crops ROIs in memory, and returns model output. It must not read PKLot XML as inference output.
 
@@ -42,13 +42,13 @@ The frontend never connects directly to PostgreSQL, the image store, or model ar
 
 | Operation | Admin | Operator |
 | --- | --- | --- |
-| Login, own identity, read lot/camera/spots/occupancy/history/image/overlay | Yes | Yes |
+| Login, own identity, read lot/camera/spots/occupancy/history/image | Yes | Yes |
 | Upload snapshot; review prediction; export CSV | Yes | Yes |
 | Create users; create/edit/delete lot or camera; create/edit/disable spots | Yes | No |
 
 Access tokens are short lived; the backend resolves the current user and role for each request. A disabled user is denied even if a token has not expired. No public registration or default account password is permitted. The initial Admin account uses the local `python -m app.bootstrap_admin --username <name>` command and a hidden password prompt.
 
-Use database constraints for uniqueness and foreign keys in [ERD.md](ERD.md). Writes that combine a snapshot and predictions are transactional. The selected revision ID is stored with each prediction to prevent later polygon edits from changing historical meaning. Reviews are append-only; derive the latest by `(reviewed_at, id)` to break ties. Race handling and upload idempotency are unresolved choices.
+Use database constraints for uniqueness and foreign keys in [ERD.md](ERD.md). Writes that combine a snapshot and predictions are transactional. The selected polygon revision ID is stored with each prediction to prevent later polygon edits from changing historical meaning. Reviews are append-only; derive the latest by `revision_no`. Review writes use an `If-Match` version and conditional SQL update so two writers using the same version cannot both commit. Upload idempotency remains unresolved.
 
 ## Geometry, image, and model boundaries
 
@@ -62,4 +62,4 @@ Use database constraints for uniqueness and foreign keys in [ERD.md](ERD.md). Wr
 
 Use the common [API error envelope](API_SPEC.md#error-conventions). A model failure must leave an auditable snapshot with unknown per-spot results or fail atomically before acceptance; the selected strategy here is unknown per spot. Authentication failures do not disclose whether a username exists. Corrupt and oversized uploads are rejected before durable persistence. The API logs a request ID but does not log secrets or image bytes.
 
-Migration/model/route tests cover relationships, constraints, provenance, configuration, image validation, prediction fallback, `STALE` time boundary and FULL/unknown count edges. A synthetic checkpoint smoke test exercises FastAPI through the actual AI predictor when its optional runtime is installed; it is not a PKLot quality evaluation. Review, derived overlay, paginated history and CSV contract tests remain for later tasks. The requirement-to-test mapping is in [RTM.md](RTM.md). `scripts/check.ps1` runs the current test suites.
+Migration/model/route tests cover relationships, constraints, provenance, configuration, image validation, prediction fallback, `STALE` time boundary, FULL/unknown count edges, pagination, review conflict/audit, and CSV. A synthetic checkpoint smoke test exercises FastAPI through the actual AI predictor when its optional runtime is installed; it is not a PKLot quality evaluation. Derived overlay contract tests remain for a later task. The requirement-to-test mapping is in [RTM.md](RTM.md). `scripts/check.ps1` runs the current test suites.

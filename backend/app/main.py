@@ -14,6 +14,7 @@ from app.auth import router as auth_router
 from app.config import AppSettings, MissingDatabaseConfiguration, get_settings
 from app.configuration import router as configuration_router
 from app.db import check_database
+from app.operations import router as operations_router
 from app.snapshots import router as snapshots_router
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
 
     api.include_router(auth_router)
     api.include_router(configuration_router)
+    api.include_router(operations_router)
     api.include_router(snapshots_router)
 
     @api.get("/health")

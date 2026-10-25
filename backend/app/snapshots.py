@@ -64,6 +64,11 @@ class PredictionOut(BaseModel):
     spot_id: UUID
     polygon_revision_id: UUID
     predicted_status: Literal["empty", "occupied", "unknown"]
+    effective_status: Literal["empty", "occupied", "unknown"]
+    review_version: int
+    latest_review_id: UUID | None
+    latest_reviewed_by: UUID | None
+    latest_reviewed_at: datetime | None
     confidence: float | None
     model_version: str | None
     reason_code: str | None
@@ -322,7 +327,7 @@ def _effective_verdicts(session: Session, snapshot_id: UUID) -> list[Verdict]:
         review = session.scalar(
             select(SpotReview)
             .where(SpotReview.prediction_id == prediction.id)
-            .order_by(SpotReview.reviewed_at.desc(), SpotReview.id.desc())
+            .order_by(SpotReview.revision_no.desc())
             .limit(1)
         )
         verdicts.append(
@@ -482,6 +487,11 @@ async def upload_and_predict(
                 spot_id=spot.spot_id,
                 polygon_revision_id=spot.revision_id,
                 predicted_status=verdict.status,
+                effective_status=verdict.status,
+                review_version=0,
+                latest_review_id=None,
+                latest_reviewed_by=None,
+                latest_reviewed_at=None,
                 confidence=verdict.confidence,
                 model_version=verdict.model_version,
                 reason_code=verdict.reason_code,
@@ -547,12 +557,25 @@ def snapshot_detail(
     output = []
     for prediction in predictions:
         revision = session.get(PolygonRevision, prediction.polygon_revision_id)
+        review = session.scalar(
+            select(SpotReview)
+            .where(SpotReview.prediction_id == prediction.id)
+            .order_by(SpotReview.revision_no.desc())
+            .limit(1)
+        )
         output.append(
             PredictionOut(
                 prediction_id=prediction.id,
                 spot_id=prediction.spot_id,
                 polygon_revision_id=prediction.polygon_revision_id,
                 predicted_status=prediction.prediction_status,
+                effective_status=(
+                    review.reviewed_status if review else prediction.prediction_status
+                ),
+                review_version=prediction.review_version,
+                latest_review_id=review.id if review else None,
+                latest_reviewed_by=review.reviewed_by if review else None,
+                latest_reviewed_at=_utc(review.reviewed_at) if review else None,
                 confidence=prediction.confidence,
                 model_version=prediction.model_version,
                 reason_code=prediction.reason_code,

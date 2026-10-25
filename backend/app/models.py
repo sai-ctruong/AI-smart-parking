@@ -319,6 +319,9 @@ class SpotPrediction(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     model_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
     reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    review_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
     inferred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -342,6 +345,10 @@ class SpotReview(Base):
             name="ck_reviews_status",
         ),
         Index("ix_reviews_prediction_reviewed", "prediction_id", "reviewed_at", "id"),
+        UniqueConstraint(
+            "prediction_id", "revision_no", name="uq_reviews_prediction_revision"
+        ),
+        CheckConstraint("revision_no > 0", name="ck_reviews_revision_no"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -352,6 +359,7 @@ class SpotReview(Base):
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     reviewed_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     reviewed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
