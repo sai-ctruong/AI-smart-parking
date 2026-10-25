@@ -7,10 +7,10 @@
 | Concern | Verified repository evidence | Proposed MVP addition |
 | --- | --- | --- |
 | Web UI | `frontend/src/App.tsx` is a placeholder React page. | Authenticated lot view, polygon editor, upload, overlay, history/review/export. |
-| HTTP API | `backend/app/main.py` exposes `/health`, auth/user routes from `backend/app/auth.py`, and lot/camera/spot configuration routes from `backend/app/configuration.py`; backend dependencies enforce Admin configuration access. CORS allows configured origins for GET/POST/PATCH/PUT/DELETE. | Image-serving, review, and CSV routes with their required backend roles. |
-| Configuration | `backend/app/config.py` separates development `.env` from production process variables and reads the token secret/TTL. | Private image root, upload limit, confidence threshold and staleness threshold, with startup validation. |
-| Database | `backend/app/db.py` supplies lazy sessions; `backend/app/models.py` and Alembic through `0004_camera_reference_geometry` define tables, token revocation state, and reference-image geometry provenance. | Transactional snapshot/review services and PostgreSQL deployment verification. |
-| AI | `ai/src/smart_parking_ai/dataset_audit.py` validates PKLot ground truth; `ai/src/inference/predictor.py` provides standalone checkpoint inference. | Backend inference integration with versioned operational output; dataset-audit XML never enters the operational API. |
+| HTTP API | `backend/app/main.py` exposes `/health`, auth/user, lot/camera/spot configuration, and snapshot predict/detail/private-image/current-occupancy routes. Backend role dependencies protect all writes and image reads. CORS allows configured origins for GET/POST/PATCH/PUT/DELETE. | Review, derived overlay, paginated history, and CSV routes. |
+| Configuration | `backend/app/config.py` separates development `.env` from production process variables and validates token secret, private image root, upload/pixel limits, model settings and stale threshold. | Retention, backup and deployment tuning. |
+| Database | `backend/app/db.py` supplies lazy sessions; `backend/app/models.py` and Alembic through `0005_snapshot_processing_time` define operational tables and metadata. | Review services and PostgreSQL deployment verification. |
+| AI | `ai/src/inference/predictor.py` provides checkpoint inference; `backend/app/snapshots.py` invokes it lazily using captured polygons and stores versioned original predictions. Dataset-audit XML does not enter the operational API. | Evaluated PKLot checkpoint deployment and monitoring. |
 | PostgreSQL | `infrastructure/compose.yaml` provides local PostgreSQL 16 with a persistent volume. | Production database provisioning/backup policy remains separate. |
 
 ## Target component boundaries
@@ -24,7 +24,7 @@ flowchart LR
   Inference -->|status, confidence, model version| API
 ```
 
-This is a **target** diagram. The existing React shell, FastAPI health/auth/configuration services, SQLAlchemy models, and local PostgreSQL configuration are implemented. Backend AI inference integration and image storage are not present. Do not use this Mermaid sketch as the final source-backed Archify diagram.
+This is a **target** diagram. The React shell, FastAPI health/auth/configuration/snapshot services, private local original-image storage, optional AI predictor bridge, SQLAlchemy models and local PostgreSQL configuration are implemented. Derived overlay, reviews, paginated history and CSV are still absent. Do not use this Mermaid sketch as the final source-backed Archify diagram.
 
 The frontend never connects directly to PostgreSQL, the image store, or model artifacts. FastAPI authenticates and authorizes every operational request, owns all validation, and keeps storage paths private. An inference adapter accepts decoded image bytes and the immutable polygon revision selected for the snapshot, crops ROIs in memory, and returns model output. It must not read PKLot XML as inference output.
 
@@ -62,4 +62,4 @@ Use database constraints for uniqueness and foreign keys in [ERD.md](ERD.md). Wr
 
 Use the common [API error envelope](API_SPEC.md#error-conventions). A model failure must leave an auditable snapshot with unknown per-spot results or fail atomically before acceptance; the selected strategy here is unknown per spot. Authentication failures do not disclose whether a username exists. Corrupt and oversized uploads are rejected before durable persistence. The API logs a request ID but does not log secrets or image bytes.
 
-The schema and configuration API have migration/model/route tests for relationships, constraints, provenance, polygon validation, reference invalidation, RBAC, and bulk updates. Image validation, prediction/unknown/review service, `STALE` time-boundary, and CSV contract tests remain for later tasks. The requirement-to-test mapping is in [RTM.md](RTM.md). `scripts/check.ps1` runs the current test suites.
+Migration/model/route tests cover relationships, constraints, provenance, configuration, image validation, prediction fallback, `STALE` time boundary and FULL/unknown count edges. A synthetic checkpoint smoke test exercises FastAPI through the actual AI predictor when its optional runtime is installed; it is not a PKLot quality evaluation. Review, derived overlay, paginated history and CSV contract tests remain for later tasks. The requirement-to-test mapping is in [RTM.md](RTM.md). `scripts/check.ps1` runs the current test suites.

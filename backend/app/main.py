@@ -1,5 +1,6 @@
 """ASGI application entry point."""
 
+import logging
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
@@ -13,6 +14,9 @@ from app.auth import router as auth_router
 from app.config import AppSettings, MissingDatabaseConfiguration, get_settings
 from app.configuration import router as configuration_router
 from app.db import check_database
+from app.snapshots import router as snapshots_router
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(settings: AppSettings | None = None) -> FastAPI:
@@ -66,8 +70,17 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
             },
         )
 
+    @api.exception_handler(SQLAlchemyError)
+    async def database_error(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+        logger.error("Database operation failed: %s", type(exc).__name__)
+        return await api_error(
+            request,
+            ApiError(503, "SERVICE_UNAVAILABLE", "Database is unavailable"),
+        )
+
     api.include_router(auth_router)
     api.include_router(configuration_router)
+    api.include_router(snapshots_router)
 
     @api.get("/health")
     def health(check_db: bool = False) -> dict[str, str]:

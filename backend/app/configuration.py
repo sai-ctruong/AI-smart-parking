@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import ApiError, get_auth_session, get_current_user, require_admin
+from app.error_schemas import ApiErrorResponse
 from app.models import (
     AuditLog,
     Camera,
@@ -22,18 +23,6 @@ from app.models import (
     User,
     validate_polygon,
 )
-
-
-class ApiErrorBody(BaseModel):
-    code: str
-    message: str
-    details: dict[str, Any]
-    request_id: str
-
-
-class ApiErrorResponse(BaseModel):
-    error: ApiErrorBody
-
 
 router = APIRouter(
     prefix="/api/v1",

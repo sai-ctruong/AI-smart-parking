@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.config import DevelopmentSettings, get_settings
+from app.config import DevelopmentSettings, ProductionSettings, get_settings
 
 
 def test_development_reads_database_and_cors_allowlist_from_env_file(tmp_path) -> None:
@@ -26,3 +26,13 @@ def test_production_requires_database_url_from_process_environment(monkeypatch) 
 
     with pytest.raises(ValidationError, match="DATABASE_URL"):
         get_settings()
+
+
+def test_production_requires_absolute_private_image_root() -> None:
+    with pytest.raises(ValidationError, match="IMAGE_STORAGE_ROOT"):
+        ProductionSettings(
+            _env_file=None,
+            database_url="postgresql+psycopg://user:pass@localhost:5432/parking",
+            auth_secret_key="test-only-secret-with-at-least-32-bytes",
+            image_storage_root="relative/images",
+        )

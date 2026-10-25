@@ -19,6 +19,14 @@ class BaseAppSettings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=list)
     auth_secret_key: SecretStr | None = None
     access_token_minutes: int = Field(default=15, ge=1, le=60)
+    image_storage_root: Path | None = None
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
+    max_image_pixels: int = Field(default=20_000_000, ge=4)
+    stale_after_seconds: int = Field(default=300, ge=1)
+    parking_model_checkpoint: Path | None = None
+    parking_confidence_threshold: float = Field(default=0.7, ge=0.5, le=1)
+    parking_inference_batch_size: int = Field(default=32, ge=1)
+    parking_inference_device: Literal["auto", "cpu", "cuda"] = "auto"
 
     model_config = SettingsConfigDict(extra="ignore")
 
@@ -45,6 +53,9 @@ class BaseAppSettings(BaseSettings):
 
 class DevelopmentSettings(BaseAppSettings):
     app_env: Literal["development"] = "development"
+    image_storage_root: Path = (
+        Path(__file__).resolve().parents[1] / "data" / "snapshots"
+    )
     model_config = SettingsConfigDict(env_file=LOCAL_ENV_FILE, extra="ignore")
 
 
@@ -57,6 +68,10 @@ class ProductionSettings(BaseAppSettings):
         if self.database_url is None:
             raise ValueError("DATABASE_URL is required when APP_ENV=production")
         self.require_auth_secret()
+        if self.image_storage_root is None or not self.image_storage_root.is_absolute():
+            raise ValueError(
+                "IMAGE_STORAGE_ROOT must be an absolute path when APP_ENV=production"
+            )
         return self
 
 

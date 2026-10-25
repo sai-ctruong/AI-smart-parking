@@ -16,6 +16,8 @@ dependencies = [
     "alembic>=1.13,<2",
     "pwdlib[argon2]>=0.2,<1",
     "PyJWT>=2.9,<3",
+    "Pillow>=11,<13",
+    "python-multipart>=0.0.20,<1",
 ]
 
 [project.optional-dependencies]

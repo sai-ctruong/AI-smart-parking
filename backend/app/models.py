@@ -233,6 +233,10 @@ class Snapshot(Base):
         CheckConstraint("width > 0 AND height > 0", name="ck_snapshots_dimensions"),
         CheckConstraint("length(sha256) = 64", name="ck_snapshots_sha256_length"),
         CheckConstraint(
+            "processing_time_ms IS NULL OR processing_time_ms >= 0",
+            name="ck_snapshots_processing_time",
+        ),
+        CheckConstraint(
             "mime_type IN ('image/jpeg', 'image/png')", name="ck_snapshots_mime_type"
         ),
         Index("ix_snapshots_camera_captured", "camera_id", "captured_at"),
@@ -257,6 +261,7 @@ class Snapshot(Base):
     byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
     width: Mapped[int] = mapped_column(Integer, nullable=False)
     height: Mapped[int] = mapped_column(Integer, nullable=False)
+    processing_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     camera: Mapped[Camera] = relationship(back_populates="snapshots")
     uploader: Mapped[User] = relationship(foreign_keys=[uploaded_by])
     predictions: Mapped[list["SpotPrediction"]] = relationship(

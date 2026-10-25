@@ -1,6 +1,6 @@
 # API contract — proposed MVP v1
 
-**Status:** Draft MVP contract. Authentication and user-account routes are implemented in `backend/app/auth.py`; lot, camera, and spot configuration routes are implemented in `backend/app/configuration.py`. Snapshot, prediction, review, statistics, and export routes remain proposed. `GET /health` keeps its existing response shape. This document is not proof of approved SRS scope. See [AUTH.md](AUTH.md) for security and [CONFIGURATION.md](CONFIGURATION.md) for working configuration examples.
+**Status:** Draft MVP contract. Authentication and user-account routes are implemented in `backend/app/auth.py`; lot, camera, and spot configuration routes are implemented in `backend/app/configuration.py`; snapshot predict/detail/private-image and current occupancy routes are implemented in `backend/app/snapshots.py`. Review, derived overlay, paginated history and export routes remain proposed. `GET /health` keeps its existing response shape. This document is not proof of approved SRS scope. See [AUTH.md](AUTH.md), [CONFIGURATION.md](CONFIGURATION.md) and [SNAPSHOT_INFERENCE.md](SNAPSHOT_INFERENCE.md) for implemented setup and examples.
 
 ## Common rules
 
@@ -35,12 +35,12 @@
 | `PUT /api/v1/spots/{spot_id}/polygon` | Admin | JSON `points`, header `If-Match: "<revision_no>"` | 200 spot with replacement revision; 409 on stale revision. |
 | `PATCH /api/v1/spots/{spot_id}` | Admin | JSON `code` and/or `is_active` | 200 updated spot; stale geometry cannot be reactivated. |
 | `DELETE /api/v1/spots/{spot_id}` | Admin | None | 204 soft deactivation; spot ID and history remain. |
-| `POST /api/v1/cameras/{camera_id}/snapshots` | Admin/Operator | Multipart `file` JPEG/PNG, optional `captured_at` UTC | 201 snapshot detail with predictions; 404 for a camera other than the configured one. |
+| `POST /api/v1/snapshots/predict` | Admin/Operator | Multipart `file` JPEG/PNG, `camera_id`, optional timezone-aware `captured_at` | 201 snapshot with predictions and coordinates; unavailable model yields explicit unknown rows. |
 | `GET /api/v1/snapshots` | Admin/Operator | `page`, `page_size`, optional `from`/`to` | 200 paginated history. |
-| `GET /api/v1/snapshots/{snapshot_id}` | Admin/Operator | None | 200 snapshot detail, predictions, latest reviews, counts. |
-| `GET /api/v1/snapshots/{snapshot_id}/image` | Admin/Operator | None | 200 original image bytes with its validated media type. |
+| `GET /api/v1/snapshots/{snapshot_id}` | Admin/Operator | None | 200 stored original predictions, captured polygons and current effective counts. |
+| `GET /api/v1/snapshots/{snapshot_id}/image` | Admin/Operator | None | 200 original image bytes with its validated media type and SHA-256 integrity check. |
 | `GET /api/v1/snapshots/{snapshot_id}/overlay` | Admin/Operator | None | 200 derived PNG; polygons colored by effective status (empty green, occupied red, unknown amber) and legend. |
-| `GET /api/v1/lots/current/occupancy` | Admin/Operator | None | 200 latest counts and active alerts. |
+| `GET /api/v1/lots/current/occupancy` | Admin/Operator | None | 200 latest effective counts, threshold and `alert_state`. |
 | `POST /api/v1/predictions/{prediction_id}/reviews` | Admin/Operator | JSON `reviewed_status`, optional `note` | 201 append-only review; re-read counts to see current effective state. |
 | `GET /api/v1/predictions/{prediction_id}/reviews` | Admin/Operator | None | 200 chronological review history. |
 | `GET /api/v1/snapshots/export.csv` | Admin/Operator | Optional `from`/`to` | 200 UTF-8 CSV with one row per prediction; no history mutation. |
@@ -65,33 +65,37 @@ Spot create body:
 
 The spot response contains `id`, `camera_id`, `code`, `is_active`, `geometry_status`, nested `polygon`, and `created_at`. The nested polygon contains `id`, `revision_no`, `points`, `reference_image`, `camera_viewpoint_version`, `created_by`, and `created_at`. `geometry_status` is `current`, `needs_recalibration`, or `legacy_missing` for rows created before the reference-image migration. `PUT /spots/{id}/polygon` appends a revision when geometry or the camera reference changes; `If-Match` must equal the current quoted decimal revision. Missing precondition returns 428, stale precondition returns 409. Soft deactivation excludes a spot from later snapshots but preserves prior prediction rows. Bulk upsert is atomic, normalizes codes to uppercase, rejects duplicate codes and identical active polygons, and reports intersecting polygons in `warnings` without discarding them. Single-spot create and polygon replace reject overlap with another current active spot using `422 OVERLAPPING_POLYGON`; shared edges alone do not count. All coordinates are relative to the declared reference image; a polygon under four pixels in that image is rejected.
 
-Successful upload returns the snapshot detail schema below. The server captures `camera_id` from the path, stores `uploaded_by`, and returns one prediction per active spot. The original file is private. A missing model still yields 201 with `unknown` results, null confidence/version, and `reason_code: "MODEL_UNAVAILABLE"` for each spot; no PKLot annotation is substituted.
+Successful upload returns the snapshot prediction schema below (selected fields shown). The server reads `camera_id` from multipart form data, stores `uploaded_by`, and returns one prediction per active current spot. The original file is private. A missing model still yields 201 with `unknown` results, null confidence/version, and `reason_code: "MODEL_UNAVAILABLE"` for each spot; no PKLot annotation is substituted. The model runtime error fallback uses `INFERENCE_ERROR` instead. The response also includes a numeric `processing_time_ms` measured before database persistence.
 
 ```json
 {
-  "id": "<snapshot-uuid>",
+  "snapshot_id": "<snapshot-uuid>",
   "camera_id": "<camera-uuid>",
-  "captured_at": "2026-10-25T08:00:00Z",
-  "uploaded_at": "2026-10-25T08:00:02Z",
+  "timestamp": "2026-10-25T08:00:00Z",
+  "total_spots": 1,
+  "empty_count": 0,
+  "occupied_count": 0,
+  "unknown_count": 1,
+  "occupancy_percent": null,
+  "model_version": null,
+  "alert_state": "NONE",
   "image_url": "/api/v1/snapshots/<snapshot-uuid>/image",
-  "overlay_url": "/api/v1/snapshots/<snapshot-uuid>/overlay",
-  "counts": {"total": 1, "empty": 0, "occupied": 0, "unknown": 1, "available_confirmed": 0, "occupancy_percent": null},
   "predictions": [{
-    "id": "<prediction-uuid>", "spot_id": "<spot-uuid>",
+    "prediction_id": "<prediction-uuid>", "spot_id": "<spot-uuid>",
     "polygon_revision_id": "<revision-uuid>",
-    "prediction_status": "unknown", "effective_status": "unknown",
+    "predicted_status": "unknown",
     "confidence": null, "model_version": null,
-    "reason_code": "MODEL_UNAVAILABLE", "inferred_at": "2026-10-25T08:00:03Z",
-    "latest_review": null
+    "reason_code": "MODEL_UNAVAILABLE",
+    "polygon": [{"x": 0.1, "y": 0.2}, {"x": 0.2, "y": 0.2}, {"x": 0.2, "y": 0.3}]
   }]
 }
 ```
 
 `POST /predictions/{id}/reviews` accepts, for example, `{"reviewed_status":"occupied","note":"Vehicle visible"}` and returns `{"id":"<uuid>","prediction_id":"<uuid>","reviewed_status":"occupied","note":"Vehicle visible","reviewed_by":"<user-uuid>","reviewed_at":"2026-10-25T08:05:00Z"}`. The prediction's original fields stay unchanged. `GET .../reviews` returns `{"items":[<review objects>]}` in ascending `(reviewed_at,id)` order.
 
-History returns `{"items":[<snapshot summaries>],"page":1,"page_size":25,"total_items":<integer>}`. Each summary contains `id`, `camera_id`, `captured_at`, `uploaded_at`, `counts`, distinct non-null `model_versions`, and `review_count`. Detail includes the same snapshot metadata plus every prediction and its latest review. Empty history has `items: []`, `total_items: 0`.
+The **proposed** paginated history endpoint returns `{"items":[<snapshot summaries>],"page":1,"page_size":25,"total_items":<integer>}`. Its final summary schema and review fields remain to be implemented. `GET /snapshots/{id}` currently returns the stored original predictions and polygon coordinates, with counts recalculated from the latest reviews if such rows exist.
 
-Occupancy response contains `snapshot_id` (nullable), `camera_id`, `captured_at` (nullable), `as_of` (server UTC), `stale_after_seconds`, `counts` (same schema as detail), and `active_alerts` (array containing `"STALE"` and/or `"FULL"`). If no snapshot exists, counts are null, occupancy percentage is null, and alerts contain `STALE`. With any unknown result, counts include it and `FULL` is absent. `STALE` takes precedence over `FULL` when a captured image ages beyond the threshold.
+Occupancy response contains `snapshot_id` (nullable), `camera_id`, `captured_at` (nullable), `as_of` (server UTC), `stale_after_seconds`, `counts` (nullable object with `total`, `empty`, `occupied`, `unknown`, `available_confirmed`, `occupancy_percent`), and singular `alert_state` (`NONE`, `FULL`, or `STALE`). If no snapshot exists, counts are null and state is `STALE`. With any unknown result, counts include it and `FULL` is absent. `FULL` requires at least one captured spot. `STALE` takes precedence when the latest acquired image is strictly older than the configured threshold.
 
 CSV columns, in order: `snapshot_id,camera_id,captured_at,uploaded_at,spot_id,polygon_revision_id,prediction_status,effective_status,confidence,model_version,reason_code,inferred_at,latest_review_id,latest_reviewed_by,latest_reviewed_at`. Null values are empty fields. A snapshot with zero active spots yields no prediction row. CSV uses standard quoting and guards spreadsheet-formula injection in free-text fields; this export currently contains no review note or username. `Content-Disposition` uses a fixed safe filename.
 
@@ -112,4 +116,4 @@ All new `/api/v1` errors use `{"error":{"code":"<STABLE_CODE>","message":"Human-
 | 428 | `PRECONDITION_REQUIRED` | Polygon update lacks `If-Match`. |
 | 503 | `SERVICE_UNAVAILABLE` | Database or private image storage unavailable; no accepted snapshot is reported. |
 
-On any error, a rejected upload creates no accepted snapshot. Implemented `/api/v1` routes include `X-Request-ID` on responses; the upload size limit remains to be defined before snapshot upload is built.
+On any upload validation or persistence error, no accepted snapshot is created. An inference failure is accepted with explicit unknown predictions instead. Implemented `/api/v1` routes include `X-Request-ID` on responses. `MAX_UPLOAD_BYTES` and `MAX_IMAGE_PIXELS` are configurable; see [SNAPSHOT_INFERENCE.md](SNAPSHOT_INFERENCE.md).
