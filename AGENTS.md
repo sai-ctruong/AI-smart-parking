@@ -32,3 +32,11 @@
 - Use `web-design-guidelines` for frontend UI review.
 - Use `react-best-practices` for React development when the skill is installed.
 - Always preserve existing functionality and run relevant tests before reporting completion.
+
+## Dataset and release diagrams
+
+- Use `PKLOT_DATASET_ROOT` for the local PKLot path; keep raw images, annotations, generated crops, audit overlays, and model artifacts out of Git. Never edit original PKLot files.
+- Treat PKLot XML occupancy labels and contours as ground truth, not AI inference output. Keep any later predictions and human review records separate.
+- At release readiness, use the project-local Archify skill in `.agents/skills/archify/` to inspect the actual repository and create source-backed architecture documentation in `docs/diagrams/`.
+- Target a system architecture diagram, an AI/ML pipeline diagram, and an end-to-end workflow diagram. Include only components, connections, and steps verified in source code; omit unimplemented modules instead of implying they exist.
+- Deliver standalone HTML diagrams and SVG exports when supported. Embed `docs/diagrams/architecture.svg` in the root README and link the remaining diagrams only after the files exist and their relative GitHub links have been checked.

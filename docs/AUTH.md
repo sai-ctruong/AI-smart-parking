@@ -1,6 +1,6 @@
 # Authentication and account setup (TASK-09)
 
-The backend provides JSON login at `POST /api/v1/auth/login`, current identity at `GET /api/v1/auth/me`, and Admin-only account creation, listing, role/activation updates, and password resets under `/api/v1/users`. Camera and parking-spot configuration routes, prediction views, and reviews are not implemented yet; future routes must use the backend `require_admin` or `get_current_user` dependency as appropriate.
+The backend provides JSON login at `POST /api/v1/auth/login`, current identity at `GET /api/v1/auth/me`, and Admin-only account creation, listing, role/activation updates, and password resets under `/api/v1/users`. Camera and parking-spot configuration, snapshot prediction/history, and review routes use backend authorization dependencies; see `CONFIGURATION.md`, `SNAPSHOT_INFERENCE.md`, and `OPERATIONS.md` for their contracts.
 
 Passwords use Argon2 via `pwdlib`. Access tokens are HS256 JWTs signed with `AUTH_SECRET_KEY`, expire after `ACCESS_TOKEN_MINUTES` (default 15), and contain a user ID and token version, not a role or password hash. Each protected request reloads the current user and role from the database. Disabling an account denies its existing tokens; resetting a password increments the token version and invalidates existing tokens. The `auth.login`, `user.created`, `user.updated`, `user.password_reset`, and `admin.bootstrapped` actions write actor/target IDs to `audit_logs`; no password or token is stored there.
 

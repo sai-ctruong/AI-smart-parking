@@ -30,16 +30,24 @@ models/
 !/ai/src/models/
 artifacts/
 checkpoints/
+/ai/data/
 /ai/runs/
+/ai/checkpoints/
+/.archify/
 /PKLot/
 *.tar
 *.tar.gz
 *.tgz
+*.7z
 *.pt
 *.pth
 *.ckpt
 *.onnx
 *.safetensors
+*.h5
+*.hdf5
+*.npy
+*.npz
 
 # Editors and OS
 .idea/

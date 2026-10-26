@@ -1,0 +1,2 @@
+# Preserve the upstream Archify skill files verbatim.
+.agents/skills/archify/** -whitespace

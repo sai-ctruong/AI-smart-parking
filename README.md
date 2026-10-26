@@ -101,7 +101,43 @@ py -m venv .venv
 .\.venv\Scripts\python.exe -m ruff format --check .
 ```
 
-Install optional computer vision dependencies only when needed: `pip install -e '.[vision,dev]'`. This does not download a dataset or model weights.
+Install optional computer vision dependencies only when needed: `pip install -e '.[vision,dev]'`. Dataset auditing uses the smaller `audit` extra below. Neither command downloads a dataset or model weights.
+
+### Local PKLot dataset and audit
+
+The extracted dataset belongs in ignored `ai/data/raw/PKLot/`. If you have a local `PKLot.tar.gz` archive at the repository root, extract it from PowerShell when you are ready:
+
+```powershell
+New-Item -ItemType Directory -Force .\ai\data\raw | Out-Null
+tar -xzf .\PKLot.tar.gz -C .\ai\data\raw
+```
+
+The archive already contains a top-level `PKLot/` folder, so this places full images and XML under `ai/data/raw/PKLot/PKLot/` and segmented images under `ai/data/raw/PKLot/PKLotSegmented/`. If you already have an extracted copy elsewhere, copy the **contents** of its top-level `PKLot` directory from the repository root:
+
+```powershell
+$source = Read-Host 'Absolute path to your extracted PKLot folder (containing PKLot and PKLotSegmented)'
+New-Item -ItemType Directory -Force .\ai\data\raw\PKLot | Out-Null
+Get-ChildItem -LiteralPath $source -Force | Copy-Item -Destination .\ai\data\raw\PKLot\ -Recurse
+```
+
+Use the path to your actual extracted copy; no source path is assumed here. Keep the original archive and extracted files unmodified. Both are ignored by Git.
+
+The existing TASK-04 inspector reads `PKLOT_DATASET_ROOT` from the current process, defaulting to `ai/data/raw/PKLot/`. For a different location, set it in PowerShell before running a full audit:
+
+```powershell
+$env:PKLOT_DATASET_ROOT = (Resolve-Path .\ai\data\raw\PKLot).Path
+cd ai
+.\.venv\Scripts\python.exe -m pip install -e '.[audit,dev]'
+.\.venv\Scripts\python.exe .\scripts\inspect_dataset.py --root .\data\raw\PKLot --output-dir .\data\audit\pklot
+```
+
+The audit validates image/XML pairing, decoding, camera and capture-day metadata, spot IDs, polygons, bounds, and empty/occupied labels. It writes `stats.json`, `samples.csv`, `errors.csv`, and up to three overlays labeled as **ground truth** under the ignored output directory. A full directory audit can take time. Before extraction, inspect a bounded archive sample from the repository root:
+
+```powershell
+.\ai\.venv\Scripts\python.exe .\ai\scripts\inspect_dataset.py --archive .\PKLot.tar.gz --max-samples 3 --output-dir .\ai\data\audit\pklot-archive
+```
+
+The three-pair archive sample was checked locally: 208 empty and 20 occupied polygons, with no errors in those three pairs. These are **sample ground-truth counts**, not full-dataset statistics or model metrics. The inspector does not train a model, generate crops, or use annotations as predictions. See [dataset documentation](docs/DATASET.md) for source, license, validation limits, and output details.
 
 ### Prepare PKLot manifests
 
@@ -135,3 +171,9 @@ In development (the default), the backend loads the root `.env` file and process
 ## Development checks
 
 From the repository root, `powershell -ExecutionPolicy Bypass -File .\scripts\check.ps1` runs installed checks. Install frontend and Python development dependencies first. See [docs/architecture.md](docs/architecture.md) for current boundaries.
+
+## Future architecture diagrams
+
+The final architecture diagrams are **pending**. At release readiness, inspect the implemented repository and use the project-local [Archify skill](.agents/skills/archify/SKILL.md) to create source-backed diagrams in `docs/diagrams/`. Planned subjects are system architecture, the AI/ML pipeline, and the end-to-end parking workflow. Diagram nodes and links must reflect implemented code; planned components and unverified deployment or model performance are omitted until established.
+
+See the [diagram generation checklist](docs/diagrams/README.md) for the exact Archify workflow, setup check, future SVG/HTML deliverables, and GitHub link checks. Add the main `architecture.svg` image and links to the other diagrams here only after those files have been generated and verified.
