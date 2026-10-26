@@ -5,6 +5,8 @@ Push-Location (Join-Path $repoRoot 'frontend')
 try {
     npm run lint
     if ($LASTEXITCODE -ne 0) { throw 'Frontend lint failed.' }
+    npm test
+    if ($LASTEXITCODE -ne 0) { throw 'Frontend tests failed.' }
     npm run format:check
     if ($LASTEXITCODE -ne 0) { throw 'Frontend format check failed.' }
     npm run build
