@@ -27,6 +27,8 @@
 | `POST /api/v1/lots/{lot_id}/cameras` | Admin | JSON `name`, `reference_image` | 201 fixed camera; 409 if lot already has one. |
 | `GET /api/v1/cameras/current`, `GET /api/v1/cameras/{camera_id}` | Admin/Operator | None | 200 camera; 404 if absent. |
 | `PATCH /api/v1/cameras/{camera_id}` | Admin | JSON `name`, `is_active`, and/or `reference_image`; `invalidate_spots` required when changing reference with existing spots | 200 camera; 409 if geometry would be silently reused. |
+| `PUT /api/v1/cameras/{camera_id}/reference-image` | Admin | Multipart `file` (JPEG/PNG matching declared SHA-256 and dimensions) | 200 declared reference metadata; 409 on mismatch, 413 oversize, 415 MIME mismatch, 422 invalid/EXIF-rotated image. |
+| `GET /api/v1/cameras/{camera_id}/reference-image` | Admin/Operator | None | 200 private original JPEG/PNG; 404 if current reference file is absent; 503 if integrity or storage fails. |
 | `DELETE /api/v1/cameras/{camera_id}` | Admin | None | 204 if no spots or snapshots; otherwise 409. |
 | `GET /api/v1/spots`, `GET /api/v1/cameras/{camera_id}/spots` | Admin/Operator | None | 200 `{ "items": [<spot>] }`. |
 | `POST /api/v1/cameras/{camera_id}/spots` | Admin | JSON `code`, `points` | 201 spot with polygon revision 1. |
@@ -114,7 +116,7 @@ All new `/api/v1` errors use `{"error":{"code":"<STABLE_CODE>","message":"Human-
 | 401 | `UNAUTHENTICATED` | Missing, expired, or invalid token; invalid login credentials. |
 | 403 | `FORBIDDEN` | Authenticated role lacks permission. |
 | 404 | `NOT_FOUND` | Unknown or inaccessible camera, spot, snapshot, or prediction. |
-| 409 | `CONFLICT` / `REVISION_CONFLICT` / `REVIEW_CONFLICT` / `VIEWPOINT_CONFLICT` / `REFERENCE_REQUIRED` | Duplicate unique value, stale review/polygon revision, or camera reference change requiring geometry invalidation/recalibration. |
+| 409 | `CONFLICT` / `REVISION_CONFLICT` / `REVIEW_CONFLICT` / `VIEWPOINT_CONFLICT` / `REFERENCE_REQUIRED` / `REFERENCE_MISMATCH` | Duplicate unique value, stale review/polygon revision, camera reference change requiring geometry invalidation/recalibration, or uploaded reference bytes not matching declared metadata. |
 | 413 | `PAYLOAD_TOO_LARGE` | Upload exceeds configured byte limit. |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Upload is not a decoded JPEG or PNG. |
 | 422 | `VALIDATION_ERROR` / `INVALID_POLYGON` / `OVERLAPPING_POLYGON` / `INVALID_IMAGE` | Invalid fields, polygon, overlapping single-spot change, date range, dimensions, or corrupt image. |

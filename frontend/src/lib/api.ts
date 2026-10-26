@@ -124,6 +124,7 @@ async function checkedResponse<T>(response: Response): Promise<T> {
       error?.message || 'Không thể hoàn tất yêu cầu.',
     )
   }
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 

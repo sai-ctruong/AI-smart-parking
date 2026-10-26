@@ -1,11 +1,15 @@
 """Admin configuration of the MVP lot, fixed camera, and spot geometry."""
 
+import hashlib
+import os
 import re
 from datetime import datetime
+from io import BytesIO
 from typing import Annotated, Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, File, Header, Request, Response, UploadFile
+from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +27,7 @@ from app.models import (
     User,
     validate_polygon,
 )
+from app.snapshots import EXTENSION_BY_MIME, _decode_image, _read_upload, _storage_root
 
 router = APIRouter(
     prefix="/api/v1",
@@ -38,6 +43,8 @@ router = APIRouter(
             "model": ApiErrorResponse,
             "description": "Configuration or revision conflict",
         },
+        413: {"model": ApiErrorResponse, "description": "Reference image too large"},
+        415: {"model": ApiErrorResponse, "description": "Unsupported image media type"},
         422: {"model": ApiErrorResponse, "description": "Invalid request or polygon"},
         428: {
             "model": ApiErrorResponse,
@@ -600,6 +607,99 @@ def current_camera(_viewer: Viewer, session: Db) -> CameraOut:
 @router.get("/cameras/{camera_id}", response_model=CameraOut)
 def get_camera(camera_id: UUID, _viewer: Viewer, session: Db) -> CameraOut:
     return _camera_out(_camera(session, camera_id))
+
+
+@router.put("/cameras/{camera_id}/reference-image", response_model=ReferenceImage)
+async def upload_reference_image(
+    camera_id: UUID,
+    request: Request,
+    admin: Admin,
+    session: Db,
+    file: UploadFile = File(...),
+) -> ReferenceImage:
+    camera = _camera(session, camera_id)
+    reference = _reference(camera)
+    if reference is None:
+        raise ApiError(
+            409, "REFERENCE_REQUIRED", "Configure camera reference metadata first"
+        )
+    settings = request.app.state.settings
+    data = await _read_upload(file, settings)
+    image = _decode_image(data, file.content_type, settings)
+    with Image.open(BytesIO(data)) as original:
+        if original.getexif().get(274, 1) != 1:
+            raise ApiError(
+                422, "INVALID_IMAGE", "Reference image must not contain EXIF rotation"
+            )
+    digest = hashlib.sha256(data).hexdigest()
+    if (digest, image.width, image.height) != (
+        reference.sha256,
+        reference.width,
+        reference.height,
+    ):
+        raise ApiError(
+            409,
+            "REFERENCE_MISMATCH",
+            "Image does not match this camera's reference fingerprint and dimensions",
+        )
+    folder = _storage_root(settings) / "references" / camera.id.hex
+    target = folder / f"{digest}{EXTENSION_BY_MIME[file.content_type]}"
+    temporary = folder / f".{uuid4().hex}.uploading"
+    try:
+        folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if target.exists():
+            if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+                raise ApiError(
+                    503,
+                    "SERVICE_UNAVAILABLE",
+                    "Stored reference image failed integrity check",
+                )
+        else:
+            with temporary.open("xb") as output:
+                output.write(data)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, target)
+    except OSError as exc:
+        raise ApiError(
+            503, "SERVICE_UNAVAILABLE", "Reference image storage is unavailable"
+        ) from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+    _audit(
+        session, admin, "config.camera.reference_image_uploaded", "camera", camera.id
+    )
+    _commit(session)
+    return reference
+
+
+@router.get("/cameras/{camera_id}/reference-image")
+def get_reference_image(
+    camera_id: UUID, request: Request, _viewer: Viewer, session: Db
+) -> Response:
+    camera = _camera(session, camera_id)
+    reference = _reference(camera)
+    if reference is None:
+        raise ApiError(404, "NOT_FOUND", "Reference image is not configured")
+    folder = _storage_root(request.app.state.settings) / "references" / camera.id.hex
+    for mime, extension in EXTENSION_BY_MIME.items():
+        target = folder / f"{reference.sha256}{extension}"
+        try:
+            if not target.is_file():
+                continue
+            data = target.read_bytes()
+        except OSError as exc:
+            raise ApiError(
+                503, "SERVICE_UNAVAILABLE", "Reference image storage is unavailable"
+            ) from exc
+        if hashlib.sha256(data).hexdigest() != reference.sha256:
+            raise ApiError(
+                503,
+                "SERVICE_UNAVAILABLE",
+                "Stored reference image failed integrity check",
+            )
+        return Response(content=data, media_type=mime)
+    raise ApiError(404, "NOT_FOUND", "Reference image has not been uploaded")
 
 
 @router.patch("/cameras/{camera_id}", response_model=CameraOut)

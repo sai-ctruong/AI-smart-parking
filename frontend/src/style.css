@@ -251,6 +251,190 @@ textarea:focus-visible {
 .login-screen {
   color: var(--text);
 }
+.reference-empty {
+  margin: 20px;
+  padding: 26px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: #f9fbfa;
+}
+.polygon-editor {
+  min-width: 0;
+}
+.polygon-toolbar,
+.polygon-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 17px;
+}
+.polygon-toolbar {
+  border-bottom: 1px solid var(--rule);
+}
+.polygon-footer {
+  border-top: 1px solid var(--rule);
+}
+.polygon-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.polygon-tools .primary-button,
+.polygon-tools .secondary-button {
+  min-height: 32px;
+  padding: 5px 10px;
+}
+.polygon-tools [aria-pressed='true'] {
+  background: #e8f2ef;
+  border-color: #a7c5c1;
+}
+.polygon-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 214px;
+  min-width: 0;
+}
+.polygon-canvas-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  background: #182a2c;
+}
+.polygon-canvas-wrap svg {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+}
+.spot-polygon {
+  fill: #176a7840;
+  stroke: #e8faf4;
+  stroke-width: 3;
+  cursor: pointer;
+}
+.spot-selected {
+  fill: #176a7880;
+  stroke: #ffffff;
+  stroke-width: 4;
+}
+.spot-invalid {
+  fill: #b423363d;
+  stroke: #ef4050;
+  stroke-width: 4;
+}
+.spot-label {
+  fill: white;
+  paint-order: stroke;
+  stroke: #12292b;
+  stroke-width: 4px;
+  font-size: 22px;
+  font-weight: 700;
+}
+.spot-vertex {
+  fill: white;
+  stroke: #176a78;
+  stroke-width: 4;
+  cursor: grab;
+}
+.spot-drawing {
+  fill: none;
+  stroke: white;
+  stroke-width: 4;
+  stroke-dasharray: 12 8;
+  pointer-events: none;
+}
+.polygon-list {
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  background: #fdfefd;
+}
+.polygon-list-heading {
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  font-weight: 650;
+}
+.polygon-list-empty {
+  padding: 20px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.polygon-rows {
+  max-height: 390px;
+  overflow-y: auto;
+}
+.polygon-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 13px;
+}
+.polygon-row:hover,
+.polygon-row-selected {
+  background: #eef4f2;
+}
+.polygon-row-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.polygon-row-error {
+  background: #c93042;
+}
+.polygon-row-meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+.polygon-inspector {
+  padding: 18px 16px;
+  border-top: 1px solid var(--border);
+}
+.polygon-error,
+.polygon-success {
+  margin: 12px 16px;
+  color: #a82032;
+  font-size: 13px;
+}
+.polygon-success {
+  color: #176a50;
+}
+@media (max-width: 1100px) {
+  .spot-label {
+    font-size: 36px;
+  }
+  .polygon-toolbar,
+  .polygon-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 700px) {
+  .spot-label {
+    font-size: 44px;
+  }
+  .polygon-workspace {
+    grid-template-columns: 1fr;
+  }
+  .polygon-list {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+  .polygon-rows {
+    max-height: 190px;
+  }
+}
 @media (max-width: 900px) {
   .app-sheet {
     grid-template-columns: 1fr;

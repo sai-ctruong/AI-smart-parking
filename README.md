@@ -1,6 +1,6 @@
 # Smart Parking Management System
 
-Solo-developed Software Engineering capstone project. This repository currently contains the application skeleton; parking workflows, persistence, and AI behavior are future tasks. Follow an approved Software Requirements Specification (SRS) when one is available. `DATT_AI_HANDOFF_2026-10-24.md`, if added, is preliminary context and does not establish approval.
+Solo-developed Software Engineering capstone project. The repository contains an authenticated operations dashboard, parking configuration and history APIs, and an AI pipeline. A real evaluated occupancy checkpoint has not yet been established. Follow an approved Software Requirements Specification (SRS) when one is available. `DATT_AI_HANDOFF_2026-10-24.md`, if added, is preliminary context and does not establish approval.
 
 ## Layout
 
@@ -57,6 +57,14 @@ npm run lint
 npm run format:check
 npm run build
 ```
+
+### Visual parking-spot editor
+
+An Admin can open **Cấu hình bãi đỗ** after logging in. First create the lot and fixed camera through the configuration API with the reference JPEG/PNG file's SHA-256 digest and pixel dimensions; see [configuration setup](docs/CONFIGURATION.md). The Admin then selects that **same file** in **Tải ảnh tham chiếu**. The backend checks its MIME type, decoded dimensions and SHA-256, rejects EXIF-rotated images, and stores it privately under `IMAGE_STORAGE_ROOT`. An Operator can view the image and polygons but cannot upload or edit them.
+
+Choose **Vẽ vùng mới**, click at least three vertices on the image, then **Hoàn tất đa giác**. Select a region in the image or list to drag its vertices and edit its code; the selected vertex's X/Y fields provide keyboard editing. Use **Hoàn tác đỉnh** or Backspace during drawing, **Hủy vẽ** or Esc to cancel, and **Di chuyển ảnh**, **Phóng to**, **Thu nhỏ**, or **Vừa ảnh** to inspect the camera view. **Lưu vùng đỗ** sends the normalized `[0,1]` polygons through the Admin-only bulk API; reloading the page fetches the same image and stored geometry. **Xóa vùng đỗ** deactivates a spot while keeping its ID and history. Invalid polygons and duplicate codes block saving; backend overlap warnings are shown after saving. Zoom and window resizing only change the view, never stored coordinates.
+
+The camera's declared reference identity is binding. If its viewpoint changes, update the camera metadata explicitly via the API and invalidate old geometry as documented in [configuration setup](docs/CONFIGURATION.md); upload the new matching image and recalibrate spots. No dataset image is copied into the application automatically.
 
 ## Backend
 

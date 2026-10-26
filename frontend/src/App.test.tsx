@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import App from './App'
@@ -131,8 +131,10 @@ test('expires the session when a protected API returns 401', async () => {
   await user.type(screen.getByLabelText('Tên đăng nhập'), 'admin')
   await user.type(screen.getByLabelText('Mật khẩu'), 'correct-password')
   await user.click(screen.getByRole('button', { name: 'Đăng nhập' }))
-  await waitFor(() => expect(window.location.pathname).toBe('/login'))
   expect(
-    screen.getByText('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
+    await screen.findByText(
+      'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+    ),
   ).toBeInTheDocument()
+  expect(window.location.pathname).toBe('/login')
 })
